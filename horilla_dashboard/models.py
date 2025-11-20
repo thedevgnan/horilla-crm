@@ -13,9 +13,9 @@ from django.utils.translation import gettext_lazy as _
 
 from horilla.registry.feature import feature_enabled
 from horilla.registry.permission_registry import permission_exempt_model
+from horilla.utils.choices import OPERATOR_CHOICES
 from horilla_core.models import HorillaContentType, HorillaCoreModel, upload_path
 from horilla_dashboard.methods import limit_content_types
-from horilla_generics.filters import OPERATOR_CHOICES
 from horilla_reports.models import Report
 from horilla_utils.methods import render_template
 

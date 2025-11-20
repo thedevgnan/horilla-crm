@@ -48,6 +48,7 @@ class OpportunitiesConfig(AppConfig):
 
             __import__("horilla_crm.opportunities.menu")
             __import__("horilla_crm.opportunities.signals")
+            __import__("horilla_crm.opportunities.dashboard")
 
         except Exception as e:
             import logging

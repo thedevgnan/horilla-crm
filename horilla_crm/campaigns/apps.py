@@ -47,6 +47,7 @@ class CampaignsConfig(AppConfig):
 
             __import__("horilla_crm.campaigns.menu")  # noqa: F401
             __import__("horilla_crm.campaigns.signals")  # noqa:F401
+            __import__("horilla_crm.campaigns.dashboard")
 
         except Exception as e:
             import logging

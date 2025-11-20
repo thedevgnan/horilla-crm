@@ -47,6 +47,7 @@ class AccountsConfig(AppConfig):
 
             __import__("horilla_crm.accounts.menu")  # noqa: F401
             __import__("horilla_crm.accounts.signals")  # noqa: F401
+            __import__("horilla_crm.accounts.dashboard")
 
         except Exception as e:
             import logging

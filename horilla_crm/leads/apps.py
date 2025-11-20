@@ -45,6 +45,7 @@ class LeadsConfig(AppConfig):
 
             __import__("horilla_crm.leads.signals")  # noqa: F401
             __import__("horilla_crm.leads.menu")  # noqa: F401
+            __import__("horilla_crm.leads.dashboard")
 
             urlpatterns.append(
                 path("leads/", include("horilla_crm.leads.urls", namespace="leads")),

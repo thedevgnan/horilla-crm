@@ -12,6 +12,7 @@ from django.utils.translation import gettext_lazy as _
 
 from horilla.registry.feature import feature_enabled
 from horilla.registry.permission_registry import permission_exempt_model
+from horilla.utils.choices import OPERATOR_CHOICES
 from horilla_core.models import (
     FiscalYearInstance,
     HorillaCoreModel,
@@ -20,7 +21,6 @@ from horilla_core.models import (
     Role,
 )
 from horilla_crm.opportunities.models import Opportunity
-from horilla_generics.filters import OPERATOR_CHOICES
 
 
 @feature_enabled(import_data=True, export_data=True)

@@ -48,6 +48,7 @@ class ContactsConfig(AppConfig):
 
             __import__("horilla_crm.contacts.menu")  # noqa: F401
             __import__("horilla_crm.contacts.signals")  # noqa:F401
+            __import__("horilla_crm.contacts.dashboard")
         except Exception as e:
             import logging
 
