@@ -6,7 +6,7 @@
 
     <div id="mainContent" class="flex-[1_0] leftspace transition-all duration-300 ease-in-out pt-0">
       <div
-        hx-get="{% url 'reports:reports_nav_view' %}?{{ request.GET.urlencode}}&title={{title}}"
+        hx-get="{% url 'horilla_reports:reports_nav_view' %}?{{ request.GET.urlencode}}&title={{title}}"
         hx-trigger="load">
       </div>
       <nav class="p-5 pt-20" aria-label="breadcrumb">

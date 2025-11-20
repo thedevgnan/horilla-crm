@@ -29,7 +29,6 @@ from horilla_core.decorators import (
     permission_required_or_denied,
 )
 from horilla_core.models import HorillaContentType
-from horilla_crm.reports.models import Report
 from horilla_dashboard.filters import DashboardFilter
 from horilla_dashboard.forms import DashboardCreateForm
 from horilla_dashboard.models import (
@@ -45,6 +44,7 @@ from horilla_generics.views import (
     HorillaSingleDeleteView,
     HorillaSingleFormView,
 )
+from horilla_reports.models import Report
 from horilla_utils.methods import get_section_info_for_model
 from horilla_utils.middlewares import _thread_local
 
@@ -234,16 +234,7 @@ class DashboardListView(LoginRequiredMixin, HorillaListView):
         context["title"] = "Dashboards"
         return context
 
-    @cached_property
-    def columns(self):
-        """Define columns for the dashboard list view."""
-        instance = self.model()
-        return [
-            (instance._meta.get_field("name").verbose_name, "name"),
-            (instance._meta.get_field("description").verbose_name, "description"),
-            (instance._meta.get_field("folder").verbose_name, "folder"),
-            (instance._meta.get_field("is_default").verbose_name, "is_default_col"),
-        ]
+    columns = ["name", "description", "folder", (_("Is Default"), "is_default_col")]
 
     @cached_property
     def action_method(self):
@@ -3326,14 +3317,7 @@ class DashboardFolderListView(LoginRequiredMixin, HorillaListView):
         queryset = queryset.filter(parent_folder=None)
         return queryset
 
-    @cached_property
-    def columns(self):
-        """Define the columns for the folder list view."""
-        instance = self.model()
-        return [
-            (instance._meta.get_field("name").verbose_name, "name"),
-            (instance._meta.get_field("description").verbose_name, "description"),
-        ]
+    columns = ["name", "description"]
 
     @cached_property
     def action_method(self):
@@ -3404,13 +3388,10 @@ class FolderDetailListView(LoginRequiredMixin, HorillaListView):
     bulk_select_option = False
     sorting_target = f"#tableview-{view_id}"
 
-    @cached_property
-    def columns(self):
-        """Define the columns for the folder detail list view."""
-        return [
-            ("Name", "name"),
-            ("Type", "get_item_type"),
-        ]
+    columns = [
+        (_("Name"), "name"),
+        (_("Type"), "get_item_type"),
+    ]
 
     @cached_property
     def action_method(self):
@@ -3697,15 +3678,7 @@ class FavouriteDashboardListView(LoginRequiredMixin, HorillaListView):
         queryset = queryset.filter(favourited_by=self.request.user)
         return queryset
 
-    @cached_property
-    def columns(self):
-        """Define the columns to be displayed in the list view."""
-        instance = self.model()
-        return [
-            (instance._meta.get_field("name").verbose_name, "name"),
-            (instance._meta.get_field("description").verbose_name, "description"),
-            (instance._meta.get_field("folder").verbose_name, "folder"),
-        ]
+    columns = ["name", "description", "folder"]
 
     @cached_property
     def col_attrs(self):
@@ -3767,13 +3740,7 @@ class FavouriteFolderListView(HorillaListView):
 
         return action_method
 
-    @cached_property
-    def columns(self):
-        """Define the columns to be displayed in the list view."""
-        instance = self.model()
-        return [
-            (instance._meta.get_field("name").verbose_name, "name"),
-        ]
+    columns = ["name"]
 
     def get_queryset(self):
         queryset = super().get_queryset()

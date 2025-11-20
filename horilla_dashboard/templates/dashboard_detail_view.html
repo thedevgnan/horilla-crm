@@ -167,9 +167,9 @@
                                                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-300 rounded-md">
                                                             <i class="fa-solid fa-file-lines text-black"></i>
                                                             <span class="font-bold">{% trans "Created From report" %}</span>
-                                                            <a href="{% url 'reports:report_detail' component.reports.pk %}"
+                                                            <a href="{% url 'horilla_reports:report_detail' component.reports.pk %}"
                                                             class="text-primary-600 hover:text-blue-800 font-bold"
-                                                            hx-get="{% url 'reports:report_detail' component.reports.pk %}"
+                                                            hx-get="{% url 'horilla_reports:report_detail' component.reports.pk %}"
                                                             hx-target="#mainContent"
                                                             hx-swap="outerHTML"
                                                             hx-select="#mainContent"

@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     # Horilla apps
     "horilla_core",
     "horilla_generics",
+    "horilla_reports",
     "horilla_dashboard",
     "horilla_utils",
     "horilla_notifications",
