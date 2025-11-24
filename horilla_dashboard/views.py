@@ -432,28 +432,6 @@ class DashboardDetailView(RecentlyViewedMixin, LoginRequiredMixin, TemplateView)
             conditions = component.conditions.all().order_by("sequence")
             queryset = self.apply_conditions(queryset, conditions)
 
-            # for condition in conditions:
-            #     if condition.operator == "equals":
-            #         queryset = queryset.filter(**{condition.field: condition.value})
-            #     elif condition.operator == "not_equals":
-            #         queryset = queryset.exclude(**{condition.field: condition.value})
-            #     elif condition.operator == "contains":
-            #         queryset = queryset.filter(
-            #             **{f"{condition.field}__icontains": condition.value}
-            #         )
-            #     elif condition.operator == "not_contains":
-            #         queryset = queryset.exclude(
-            #             **{f"{condition.field}__icontains": condition.value}
-            #         )
-            #     elif condition.operator == "greater_than":
-            #         queryset = queryset.filter(
-            #             **{f"{condition.field}__gt": condition.value}
-            #         )
-            #     elif condition.operator == "less_than":
-            #         queryset = queryset.filter(
-            #             **{f"{condition.field}__lt": condition.value}
-            #         )
-
             # KPIs always use count
             value = queryset.count()
 
@@ -834,52 +812,6 @@ class DashboardDetailView(RecentlyViewedMixin, LoginRequiredMixin, TemplateView)
 
         return queryset
 
-    # def apply_conditions(self, queryset, conditions):
-    #     """Apply filter conditions to a queryset."""
-    #     for condition in conditions:
-    #         field = condition.field
-    #         operator = condition.operator
-    #         value = condition.value
-
-    #         if operator == "equals":
-    #             queryset = queryset.filter(**{f"{field}": value})
-    #         elif operator == "not_equals":
-    #             queryset = queryset.exclude(**{f"{field}": value})
-    #         elif operator == "greater_than":
-    #             try:
-    #                 queryset = queryset.filter(**{f"{field}__gt": float(value)})
-    #             except ValueError:
-    #                 queryset = queryset.filter(**{f"{field}__gt": value})
-    #         elif operator == "less_than":
-    #             try:
-    #                 queryset = queryset.filter(**{f"{field}__lt": float(value)})
-    #             except ValueError:
-    #                 queryset = queryset.filter(**{f"{field}__lt": value})
-    #         elif operator == "greater_equal":
-    #             try:
-    #                 queryset = queryset.filter(**{f"{field}__gte": float(value)})
-    #             except ValueError:
-    #                 queryset = queryset.filter(**{f"{field}__gte": value})
-    #         elif operator == "less_equal":
-    #             try:
-    #                 queryset = queryset.filter(**{f"{field}__lte": float(value)})
-    #             except ValueError:
-    #                 queryset = queryset.filter(**{f"{field}__lte": value})
-    #         elif operator == "contains":
-    #             queryset = queryset.filter(**{f"{field}__icontains": value})
-    #         elif operator == "not_contains":
-    #             queryset = queryset.exclude(**{f"{field}__icontains": value})
-    #         elif operator == "starts_with":
-    #             queryset = queryset.filter(**{f"{field}__istartswith": value})
-    #         elif operator == "ends_with":
-    #             queryset = queryset.filter(**{f"{field}__iendswith": value})
-    #         elif operator == "is_null":
-    #             queryset = queryset.filter(**{f"{field}__isnull": True})
-    #         elif operator == "is_not_null":
-    #             queryset = queryset.filter(**{f"{field}__isnull": False})
-
-    #     return queryset
-
     def get_table_data(self, component, request):
         """
         Generate table data and context for a dashboard component using HorillaListView.
@@ -1215,49 +1147,6 @@ class DashboardComponentTableDataView(LoginRequiredMixin, View):
         detail_view = DashboardDetailView()
         detail_view.request = request
         queryset = detail_view.apply_conditions(queryset, conditions)
-
-        # Apply conditions
-        # conditions = component.conditions.all().order_by("sequence")
-        # for condition in conditions:
-        #     field = condition.field
-        #     operator = condition.operator
-        #     value = condition.value
-        #     if operator == "equals":
-        #         queryset = queryset.filter(**{f"{field}": value})
-        #     elif operator == "not_equals":
-        #         queryset = queryset.exclude(**{f"{field}": value})
-        #     elif operator == "greater_than":
-        #         try:
-        #             queryset = queryset.filter(**{f"{field}__gt": float(value)})
-        #         except ValueError:
-        #             queryset = queryset.filter(**{f"{field}__gt": value})
-        #     elif operator == "less_than":
-        #         try:
-        #             queryset = queryset.filter(**{f"{field}__lt": float(value)})
-        #         except ValueError:
-        #             queryset = queryset.filter(**{f"{field}__lt": value})
-        #     elif operator == "greater_equal":
-        #         try:
-        #             queryset = queryset.filter(**{f"{field}__gte": float(value)})
-        #         except ValueError:
-        #             queryset = queryset.filter(**{f"{field}__gte": value})
-        #     elif operator == "less_equal":
-        #         try:
-        #             queryset = queryset.filter(**{f"{field}__lte": float(value)})
-        #         except ValueError:
-        #             queryset = queryset.filter(**{f"{field}__lte": value})
-        #     elif operator == "contains":
-        #         queryset = queryset.filter(**{f"{field}__icontains": value})
-        #     elif operator == "not_contains":
-        #         queryset = queryset.exclude(**{f"{field}__icontains": value})
-        #     elif operator == "starts_with":
-        #         queryset = queryset.filter(**{f"{field}__istartswith": value})
-        #     elif operator == "ends_with":
-        #         queryset = queryset.filter(**{f"{field}__iendswith": value})
-        #     elif operator == "is_null":
-        #         queryset = queryset.filter(**{f"{field}__isnull": True})
-        #     elif operator == "is_not_null":
-        #         queryset = queryset.filter(**{f"{field}__isnull": False})
 
         # Apply sorting
         sort_field = request.GET.get("sort", None)
@@ -2379,30 +2268,6 @@ class DashboardComponentChartView(View):
             conditions = component.conditions.all().order_by("sequence")
             queryset = self.apply_conditions(queryset, conditions)
 
-            # conditions = component.conditions.all()
-
-            # for condition in conditions:
-            #     if condition.operator == "equals":
-            #         queryset = queryset.filter(**{condition.field: condition.value})
-            #     elif condition.operator == "not_equals":
-            #         queryset = queryset.exclude(**{condition.field: condition.value})
-            #     elif condition.operator == "contains":
-            #         queryset = queryset.filter(
-            #             **{f"{condition.field}__icontains": condition.value}
-            #         )
-            #     elif condition.operator == "not_contains":
-            #         queryset = queryset.exclude(
-            #             **{f"{condition.field}__icontains": condition.value}
-            #         )
-            #     elif condition.operator == "greater_than":
-            #         queryset = queryset.filter(
-            #             **{f"{condition.field}__gt": condition.value}
-            #         )
-            #     elif condition.operator == "less_than":
-            #         queryset = queryset.filter(
-            #             **{f"{condition.field}__lt": condition.value}
-            #         )
-
             value = queryset.count()
 
             section_info = get_section_info_for_model(model)
@@ -2746,42 +2611,6 @@ class DashboardComponentChartView(View):
 
             conditions = component.conditions.all().order_by("sequence")
             queryset = self.apply_conditions(queryset, conditions)
-
-            # Apply conditions if any
-            # conditions = component.conditions.all()
-            # for condition in conditions:
-            #     if condition.operator == "equals":
-            #         queryset = queryset.filter(**{condition.field: condition.value})
-            #     elif condition.operator == "not_equals":
-            #         queryset = queryset.exclude(**{condition.field: condition.value})
-            #     elif condition.operator == "contains":
-            #         queryset = queryset.filter(
-            #             **{f"{condition.field}__icontains": condition.value}
-            #         )
-            #     elif condition.operator == "not_contains":
-            #         queryset = queryset.exclude(
-            #             **{f"{condition.field}__icontains": condition.value}
-            #         )
-            #     elif condition.operator == "greater_than":
-            #         queryset = queryset.filter(
-            #             **{f"{condition.field}__gt": condition.value}
-            #         )
-            #     elif condition.operator == "less_than":
-            #         queryset = queryset.filter(
-            #             **{f"{condition.field}__lt": condition.value}
-            #         )
-            #     elif condition.operator == "greater_equal":
-            #         queryset = queryset.filter(
-            #             **{f"{condition.field}__gte": condition.value}
-            #         )
-            #     elif condition.operator == "less_equal":
-            #         queryset = queryset.filter(
-            #             **{f"{condition.field}__lte": condition.value}
-            #         )
-            #     elif condition.operator == "is_null":
-            #         queryset = queryset.filter(**{f"{condition.field}__isnull": True})
-            #     elif condition.operator == "is_not_null":
-            #         queryset = queryset.filter(**{f"{condition.field}__isnull": False})
 
             if queryset.count() == 0:
                 logger.warning(f"Empty queryset for component {component.id}")

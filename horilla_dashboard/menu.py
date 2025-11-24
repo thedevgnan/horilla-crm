@@ -31,7 +31,7 @@ class DashboardSubSection:
     verbose_name = _("Dashboards")
     icon = "assets/icons/dashboards.svg"
     url = reverse_lazy("horilla_dashboard:dashboard_list_view")
-    app_label = "horilla_dashboard"
+    app_label = "dashboard"
     perm = ["horilla_dashboard.view_dashboard", "horilla_dashboard.view_own_dashboard"]
     position = 2
     attrs = {

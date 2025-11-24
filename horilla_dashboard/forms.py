@@ -1,4 +1,4 @@
-"""Forms for horilla_dashboard app."""
+"""Forms for dashboards app."""
 
 import json
 import logging
@@ -161,81 +161,96 @@ class DashboardCreateForm(HorillaModelForm):
                     self.instance_obj
                     and self.instance_obj.pk
                     and self.instance_obj.columns
-                    and model_name
                 ):
-                    if isinstance(self.instance_obj.columns, str):
-                        if self.instance_obj.columns.startswith("["):
-                            columns_list = json.loads(self.instance_obj.columns)
+                    instance_model_name = None
+                    if self.instance_obj.module:
+                        instance_model_name = self.instance_obj.module.model
+
+                    if instance_model_name:
+                        if isinstance(self.instance_obj.columns, str):
+                            if self.instance_obj.columns.startswith("["):
+                                columns_list = json.loads(self.instance_obj.columns)
+                            else:
+                                columns_list = [
+                                    col.strip()
+                                    for col in self.instance_obj.columns.split(",")
+                                    if col.strip()
+                                ]
                         else:
-                            columns_list = [
-                                col.strip()
-                                for col in self.instance_obj.columns.split(",")
-                                if col.strip()
-                            ]
-                    else:
-                        columns_list = (
-                            self.instance_obj.columns
-                            if isinstance(self.instance_obj.columns, list)
-                            else []
-                        )
-
-                    model = None
-                    for app_config in apps.get_app_configs():
-                        try:
-                            model = apps.get_model(
-                                app_label=app_config.label,
-                                model_name=model_name.lower(),
+                            columns_list = (
+                                self.instance_obj.columns
+                                if isinstance(self.instance_obj.columns, list)
+                                else []
                             )
-                            break
-                        except LookupError:
-                            continue
 
-                    if model:
-                        column_choices = []
-                        for field in model._meta.get_fields():
-                            if field.concrete and not field.is_relation:
-                                field_name = field.name
-                                field_label = field.verbose_name or field.name
-                                if hasattr(field, "get_internal_type"):
-                                    field_type = field.get_internal_type()
-                                    if field_type in [
-                                        "CharField",
-                                        "TextField",
-                                        "BooleanField",
-                                        "DateField",
-                                        "DateTimeField",
-                                        "TimeField",
-                                        "EmailField",
-                                        "URLField",
-                                    ]:
-                                        column_choices.append((field_name, field_label))
-                                    elif hasattr(field, "choices") and field.choices:
-                                        column_choices.append((field_name, field_label))
-                            elif hasattr(field, "related_model") and field.many_to_one:
-                                field_name = field.name
-                                field_label = field.verbose_name or field.name
-                                column_choices.append((field_name, field_label))
+                        # Find the model
+                        model = None
+                        for app_config in apps.get_app_configs():
+                            try:
+                                model = apps.get_model(
+                                    app_label=app_config.label,
+                                    model_name=instance_model_name.lower(),
+                                )
+                                break
+                            except LookupError:
+                                continue
 
-                        # Recreate the field
-                        self.fields["columns"] = forms.MultipleChoiceField(
-                            choices=column_choices,
-                            required=False,
-                            widget=forms.SelectMultiple(
-                                attrs={
-                                    "class": "js-example-basic-multiple headselect",
-                                    "id": "id_columns",
-                                    "name": "columns",
-                                    "data-placeholder": "Add Columns",
-                                    "tabindex": "-1",
-                                    "aria-hidden": "true",
-                                    "multiple": True,
-                                }
-                            ),
-                        )
+                        if model:
+                            column_choices = []
+                            for field in model._meta.get_fields():
+                                if field.concrete and not field.is_relation:
+                                    field_name = field.name
+                                    field_label = field.verbose_name or field.name
+                                    if hasattr(field, "get_internal_type"):
+                                        field_type = field.get_internal_type()
+                                        if field_type in [
+                                            "CharField",
+                                            "TextField",
+                                            "BooleanField",
+                                            "DateField",
+                                            "DateTimeField",
+                                            "TimeField",
+                                            "EmailField",
+                                            "URLField",
+                                        ]:
+                                            column_choices.append(
+                                                (field_name, field_label)
+                                            )
+                                        elif (
+                                            hasattr(field, "choices") and field.choices
+                                        ):
+                                            column_choices.append(
+                                                (field_name, field_label)
+                                            )
+                                elif (
+                                    hasattr(field, "related_model")
+                                    and field.many_to_one
+                                ):
+                                    field_name = field.name
+                                    field_label = field.verbose_name or field.name
+                                    column_choices.append((field_name, field_label))
 
-                        self.initial["columns"] = columns_list
+                            # Recreate the field with choices
+                            self.fields["columns"] = forms.MultipleChoiceField(
+                                choices=column_choices,
+                                required=False,
+                                widget=forms.SelectMultiple(
+                                    attrs={
+                                        "class": "js-example-basic-multiple headselect",
+                                        "id": "id_columns",
+                                        "name": "columns",
+                                        "data-placeholder": "Add Columns",
+                                        "tabindex": "-1",
+                                        "aria-hidden": "true",
+                                        "multiple": True,
+                                    }
+                                ),
+                            )
 
+                            # Set the initial value with the saved columns
+                            self.initial["columns"] = columns_list
                 else:
+                    # New instance - set up empty multi-select
                     self.fields["columns"].widget = forms.SelectMultiple(
                         attrs={
                             "class": "js-example-basic-multiple headselect",
