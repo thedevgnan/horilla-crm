@@ -1,25 +1,42 @@
 from horilla_dashboard.utils import DefaultDashboardGenerator
+
 from .models import Contact
 
 
 def contact_table_fields(model_class):
     """Return list of {name, verbose_name} for contact table columns."""
-    
+
     priority = ["title", "first_name", "email", "contact_source"]
     fields = []
     for name in priority:
         try:
             f = model_class._meta.get_field(name)
-            fields.append({"name": name, "verbose_name": f.verbose_name or name.replace("_", " ").title()})
+            fields.append(
+                {
+                    "name": name,
+                    "verbose_name": f.verbose_name or name.replace("_", " ").title(),
+                }
+            )
         except Exception:
             continue
     if len(fields) < 4:
         for f in model_class._meta.fields:
             if len(fields) >= 4:
                 break
-            if f.name not in [x["name"] for x in fields] and f.get_internal_type() in ["CharField", "TextField", "EmailField"]:
-                fields.append({"name": f.name, "verbose_name": f.verbose_name or f.name.replace("_", " ").title()})
+            if f.name not in [x["name"] for x in fields] and f.get_internal_type() in [
+                "CharField",
+                "TextField",
+                "EmailField",
+            ]:
+                fields.append(
+                    {
+                        "name": f.name,
+                        "verbose_name": f.verbose_name
+                        or f.name.replace("_", " ").title(),
+                    }
+                )
     return fields
+
 
 DefaultDashboardGenerator.extra_models.append(
     {
@@ -27,6 +44,5 @@ DefaultDashboardGenerator.extra_models.append(
         "name": "Contacts",
         "icon": "fa-address-book",
         "color": "green",
-        
     }
 )

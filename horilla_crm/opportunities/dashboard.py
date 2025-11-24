@@ -1,24 +1,22 @@
-from horilla_dashboard.utils import DefaultDashboardGenerator
-from .models import Opportunity
+import logging
+
 from django.db.models import Count
 from django.utils.http import urlencode
+
+from horilla_dashboard.utils import DefaultDashboardGenerator
 from horilla_utils.methods import get_section_info_for_model
-import logging
+
+from .models import Opportunity
+
 logger = logging.getLogger(__name__)
-
-
 
 
 def create_opportunity_charts(self, queryset, model_info):
     """Create opportunity-specific charts"""
     try:
-        if hasattr(queryset.model, "lead_source") or hasattr(
-            queryset.model, "source"
-        ):
+        if hasattr(queryset.model, "lead_source") or hasattr(queryset.model, "source"):
             source_field = (
-                "lead_source"
-                if hasattr(queryset.model, "lead_source")
-                else "source"
+                "lead_source" if hasattr(queryset.model, "lead_source") else "source"
             )
             source_data = (
                 queryset.values(source_field)
@@ -34,13 +32,15 @@ def create_opportunity_charts(self, queryset, model_info):
                 urls = []
                 for item in source_data:
                     value = item[source_field] or "Unknown"
-                    query = urlencode({
-                        "section": section_info["section"],
-                        "apply_filter": "true",
-                        "field": source_field,
-                        "operator": "exact",
-                        "value": value
-                    })
+                    query = urlencode(
+                        {
+                            "section": section_info["section"],
+                            "apply_filter": "true",
+                            "field": source_field,
+                            "operator": "exact",
+                            "value": value,
+                        }
+                    )
                     urls.append(f"{section_info['url']}?{query}")
 
                 return {
@@ -101,9 +101,7 @@ def create_opportunity_charts(self, queryset, model_info):
                 }
 
         if hasattr(queryset.model, "amount") or hasattr(queryset.model, "value"):
-            amount_field = (
-                "amount" if hasattr(queryset.model, "amount") else "value"
-            )
+            amount_field = "amount" if hasattr(queryset.model, "amount") else "value"
 
             opportunities = list(
                 queryset.values("id", amount_field).exclude(
@@ -143,25 +141,43 @@ def create_opportunity_charts(self, queryset, model_info):
 
 def opportuntiy_table_fields(model_class):
     """Return list of {name, verbose_name} for opportuntiy table columns."""
-    
+
     priority = ["name", "title", "account", "amount", "stage"]
     fields = []
     for name in priority:
         try:
             f = model_class._meta.get_field(name)
-            fields.append({"name": name, "verbose_name": f.verbose_name or name.replace("_", " ").title()})
+            fields.append(
+                {
+                    "name": name,
+                    "verbose_name": f.verbose_name or name.replace("_", " ").title(),
+                }
+            )
         except Exception:
             continue
     if len(fields) < 4:
         for f in model_class._meta.fields:
             if len(fields) >= 4:
                 break
-            if f.name not in [x["name"] for x in fields] and f.get_internal_type() in ["CharField", "TextField", "EmailField"]:
-                fields.append({"name": f.name, "verbose_name": f.verbose_name or f.name.replace("_", " ").title()})
+            if f.name not in [x["name"] for x in fields] and f.get_internal_type() in [
+                "CharField",
+                "TextField",
+                "EmailField",
+            ]:
+                fields.append(
+                    {
+                        "name": f.name,
+                        "verbose_name": f.verbose_name
+                        or f.name.replace("_", " ").title(),
+                    }
+                )
     return fields
 
+
 def opportunity_table_func(generator, model_info):
-    filter_kwargs = {"stage__name": "Closed Won"} if hasattr(model_info["model"], "stage") else {}
+    filter_kwargs = (
+        {"stage__name": "Closed Won"} if hasattr(model_info["model"], "stage") else {}
+    )
 
     return generator.build_table_context(
         model_info=model_info,

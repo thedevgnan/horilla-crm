@@ -1,9 +1,13 @@
-from horilla_dashboard.utils import DefaultDashboardGenerator
-from .models import Campaign
+import logging
+
 from django.db.models import Count
 from django.utils.http import urlencode
+
+from horilla_dashboard.utils import DefaultDashboardGenerator
 from horilla_utils.methods import get_section_info_for_model
-import logging
+
+from .models import Campaign
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,28 +19,39 @@ def campaign_table_fields(model_class):
     for name in priority:
         try:
             f = model_class._meta.get_field(name)
-            fields.append({"name": name, "verbose_name": f.verbose_name or name.replace("_", " ").title()})
+            fields.append(
+                {
+                    "name": name,
+                    "verbose_name": f.verbose_name or name.replace("_", " ").title(),
+                }
+            )
         except Exception:
             continue
     if len(fields) < 4:
         for f in model_class._meta.fields:
             if len(fields) >= 4:
                 break
-            if f.name not in [x["name"] for x in fields] and f.get_internal_type() in ["CharField", "TextField", "EmailField"]:
-                fields.append({"name": f.name, "verbose_name": f.verbose_name or f.name.replace("_", " ").title()})
+            if f.name not in [x["name"] for x in fields] and f.get_internal_type() in [
+                "CharField",
+                "TextField",
+                "EmailField",
+            ]:
+                fields.append(
+                    {
+                        "name": f.name,
+                        "verbose_name": f.verbose_name
+                        or f.name.replace("_", " ").title(),
+                    }
+                )
     return fields
 
 
 def create_campaign_charts(self, queryset, model_info):
     """Create campaign-specific charts"""
     try:
-        if hasattr(queryset.model, "campaign_type") or hasattr(
-            queryset.model, "type"
-        ):
+        if hasattr(queryset.model, "campaign_type") or hasattr(queryset.model, "type"):
             type_field = (
-                "campaign_type"
-                if hasattr(queryset.model, "campaign_type")
-                else "type"
+                "campaign_type" if hasattr(queryset.model, "campaign_type") else "type"
             )
             type_data = (
                 queryset.values(type_field)
@@ -52,13 +67,15 @@ def create_campaign_charts(self, queryset, model_info):
                 urls = []
                 for item in type_data:
                     value = item[type_field] or "Unknown"
-                    query = urlencode({
-                        "section": section_info["section"],
-                        "apply_filter": "true",
-                        "field": type_field,
-                        "operator": "exact",
-                        "value": value
-                    })
+                    query = urlencode(
+                        {
+                            "section": section_info["section"],
+                            "apply_filter": "true",
+                            "field": type_field,
+                            "operator": "exact",
+                            "value": value,
+                        }
+                    )
                     urls.append(f"{section_info['url']}?{query}")
 
                 return {
@@ -74,9 +91,7 @@ def create_campaign_charts(self, queryset, model_info):
 
         if hasattr(queryset.model, "status"):
             status_data = (
-                queryset.values("status")
-                .annotate(count=Count("id"))
-                .order_by("-count")
+                queryset.values("status").annotate(count=Count("id")).order_by("-count")
             )
 
             if status_data.exists():

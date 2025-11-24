@@ -1,8 +1,10 @@
-from horilla_dashboard.utils import DefaultDashboardGenerator
-from .models import Lead
 from django.db.models import Count
 from django.utils.http import urlencode
+
+from horilla_dashboard.utils import DefaultDashboardGenerator
 from horilla_utils.methods import get_section_info_for_model
+
+from .models import Lead
 
 
 def create_lead_charts(self, queryset, model_info):
@@ -12,7 +14,9 @@ def create_lead_charts(self, queryset, model_info):
     try:
         # ---- lead source chart ----
         if hasattr(queryset.model, "lead_source") or hasattr(queryset.model, "source"):
-            field = "lead_source" if hasattr(queryset.model, "lead_source") else "source"
+            field = (
+                "lead_source" if hasattr(queryset.model, "lead_source") else "source"
+            )
 
             data = queryset.values(field).annotate(count=Count("id")).order_by("-count")
 
@@ -25,13 +29,15 @@ def create_lead_charts(self, queryset, model_info):
 
                 for item in data:
                     value = item[field] or "Unknown"
-                    query = urlencode({
-                        "section": section["section"],
-                        "apply_filter": "true",
-                        "field": field,
-                        "operator": "exact",
-                        "value": value,
-                    })
+                    query = urlencode(
+                        {
+                            "section": section["section"],
+                            "apply_filter": "true",
+                            "field": field,
+                            "operator": "exact",
+                            "value": value,
+                        }
+                    )
                     urls.append(f"{section['url']}?{query}")
 
                 return {
@@ -46,13 +52,21 @@ def create_lead_charts(self, queryset, model_info):
                 }
 
         # ---- conversion status chart ----
-        if hasattr(queryset.model, "is_converted") or hasattr(queryset.model, "converted"):
-            field = "is_converted" if hasattr(queryset.model, "is_converted") else "converted"
+        if hasattr(queryset.model, "is_converted") or hasattr(
+            queryset.model, "converted"
+        ):
+            field = (
+                "is_converted"
+                if hasattr(queryset.model, "is_converted")
+                else "converted"
+            )
 
             data = queryset.values(field).annotate(count=Count("id"))
 
             if data.exists():
-                labels = ["Converted" if row[field] else "Not Converted" for row in data]
+                labels = [
+                    "Converted" if row[field] else "Not Converted" for row in data
+                ]
                 values = [row["count"] for row in data]
 
                 return {
@@ -67,7 +81,9 @@ def create_lead_charts(self, queryset, model_info):
 
         # ---- status chart ----
         if hasattr(queryset.model, "status"):
-            data = queryset.values("status").annotate(count=Count("id")).order_by("-count")
+            data = (
+                queryset.values("status").annotate(count=Count("id")).order_by("-count")
+            )
 
             if data.exists():
                 labels = [row["status"] or "No Status" for row in data]
@@ -97,20 +113,37 @@ def lead_table_fields(model_class):
     for name in priority:
         try:
             f = model_class._meta.get_field(name)
-            fields.append({"name": name, "verbose_name": f.verbose_name or name.replace("_", " ").title()})
+            fields.append(
+                {
+                    "name": name,
+                    "verbose_name": f.verbose_name or name.replace("_", " ").title(),
+                }
+            )
         except Exception:
             continue
     if len(fields) < 4:
         for f in model_class._meta.fields:
             if len(fields) >= 4:
                 break
-            if f.name not in [x["name"] for x in fields] and f.get_internal_type() in ["CharField", "TextField", "EmailField"]:
-                fields.append({"name": f.name, "verbose_name": f.verbose_name or f.name.replace("_", " ").title()})
+            if f.name not in [x["name"] for x in fields] and f.get_internal_type() in [
+                "CharField",
+                "TextField",
+                "EmailField",
+            ]:
+                fields.append(
+                    {
+                        "name": f.name,
+                        "verbose_name": f.verbose_name
+                        or f.name.replace("_", " ").title(),
+                    }
+                )
     return fields
 
 
 def lead_table_func(generator, model_info):
-    filter_kwargs = {"is_convert": True} if hasattr(model_info["model"], "is_convert") else {}
+    filter_kwargs = (
+        {"is_convert": True} if hasattr(model_info["model"], "is_convert") else {}
+    )
     return generator.build_table_context(
         model_info=model_info,
         title="Won Leads",
@@ -122,7 +155,9 @@ def lead_table_func(generator, model_info):
 
 
 def lead_table_func(generator, model_info):
-    filter_kwargs = {"is_convert": True} if hasattr(model_info["model"], "is_convert") else {}
+    filter_kwargs = (
+        {"is_convert": True} if hasattr(model_info["model"], "is_convert") else {}
+    )
 
     return generator.build_table_context(
         model_info=model_info,
