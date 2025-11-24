@@ -69,3 +69,32 @@ class ReportForm(HorillaModelForm):
             return ",".join(filtered_selected)
 
         raise forms.ValidationError("At least one column must be selected.")
+
+
+class ChangeChartReportForm(HorillaModelForm):
+
+    class Meta:
+        model = Report
+        fields = ["chart_type"]
+
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.get("request")
+        super().__init__(*args, **kwargs)
+
+        total_groups = self.request.GET.get("total")
+
+        try:
+            total_groups = int(total_groups)
+        except (TypeError, ValueError):
+            total_groups = 0
+
+        chart_choices = Report.CHART_TYPES
+
+        if total_groups <= 1:
+            chart_choices = [
+                c
+                for c in chart_choices
+                if c[0] not in ["stacked_vertical", "stacked_horizontal"]
+            ]
+
+        self.fields["chart_type"].choices = chart_choices

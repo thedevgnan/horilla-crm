@@ -460,3 +460,13 @@ def is_choice_or_foreign(report, field_name):
 @register.filter
 def get_field_choices(report, field_name):
     return report.get_field_choices(field_name)
+
+
+@register.filter
+def get_display_text(composite_key):
+    """Extract display text from composite key format 'Display||ID'"""
+    if isinstance(composite_key, dict):
+        return composite_key.get("_display", composite_key)
+    if "||" in str(composite_key):
+        return str(composite_key).split("||")[0]
+    return str(composite_key)

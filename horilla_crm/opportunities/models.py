@@ -897,6 +897,7 @@ class OpportunitySplitType(HorillaCoreModel):
         return not self.totals_100_percent
 
 
+@feature_enabled(report_choices=True)
 class OpportunitySplit(HorillaCoreModel):
     """
     Represents credit splits for each Opportunity.

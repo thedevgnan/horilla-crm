@@ -46,7 +46,7 @@ from horilla_generics.views import (
     HorillaSingleFormView,
 )
 from horilla_reports.filters import ReportFilter
-from horilla_reports.forms import ReportForm
+from horilla_reports.forms import ChangeChartReportForm, ReportForm
 from horilla_reports.models import Report, ReportFolder
 from horilla_utils.methods import get_section_info_for_model
 from horilla_utils.middlewares import _thread_local
@@ -282,6 +282,7 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
         section = get_section_info_for_model(model_class)
         section_value = section["section"]
         query_params["section"] = section_value
+        query_params["session_url"] = False
         query_string = urlencode(query_params)
         attrs = {}
 
@@ -483,7 +484,8 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
         list_view.clear_session_button_enabled = False
         list_view.list_column_visibility = False
         list_view.table_height_as_class = "h-[200px]"
-        list_view.col_attrs = self.col_attrs()
+        if hasattr(report.model_class, "get_detail_url"):
+            list_view.col_attrs = self.col_attrs()
         sort_field = self.request.GET.get("sort")
         sort_direction = self.request.GET.get("direction", "asc")
 
@@ -497,16 +499,26 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
         current_referer = self.request.META.get("HTTP_REFERER")
         hx_current_url = self.request.headers.get("HX-Current-URL")
         stored_referer = self.request.session.get(session_referer_key)
+        report_detail_base = f"/reports/report-detail/{report.pk}/"
+        session_url_value = self.request.GET.get("session_url")
+
         if hx_current_url:
-            previous_url = hx_current_url
             hx_path = urlparse(hx_current_url).path
-            if hx_path != self.request.path:
+            is_from_report_detail = hx_path == report_detail_base
+            if not is_from_report_detail and session_url_value != "False":
                 self.request.session[session_referer_key] = hx_current_url
+                previous_url = hx_current_url
+            else:
+                previous_url = (
+                    stored_referer
+                    if stored_referer
+                    else reverse_lazy("horilla_reports:reports_list_view")
+                )
         elif stored_referer:
             previous_url = stored_referer
         elif current_referer and self.request.get_host() in current_referer:
             referer_path = urlparse(current_referer).path
-            if referer_path != self.request.path:
+            if referer_path != report_detail_base:
                 previous_url = current_referer
                 self.request.session[session_referer_key] = current_referer
             else:
@@ -514,6 +526,9 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
         else:
             previous_url = reverse_lazy("horilla_reports:reports_list_view")
         context["previous_url"] = previous_url
+        context["total_groups_count"] = len(temp_report.row_groups_list) + len(
+            temp_report.column_groups_list
+        )
         return context
 
     def create_temp_report(self, original_report, preview_data):
@@ -661,13 +676,18 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
 
             # Convert to display values
             for row, count in count_grouped.items():
-                display_value = self.get_display_value(row, row_field, model_class)
-                display_grouped[display_value] = {"Count": count}
+                display_info = self.get_display_value(row, row_field, model_class)
+                composite_key = display_info["composite_key"]
+                display_grouped[composite_key] = {
+                    "Count": count,
+                    "_display": display_info["display"],
+                    "_id": display_info["id"],
+                }
                 for agg in aggregate_columns:
-                    display_grouped[display_value][agg["name"]] = agg["data"].get(
+                    display_grouped[composite_key][agg["name"]] = agg["data"].get(
                         row, 0
                     )
-                display_rows.append(display_value)
+                display_rows.append(composite_key)
 
             context["pivot_index"] = display_rows
             context["pivot_table"] = display_grouped
@@ -706,16 +726,22 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
             display_rows = []
             display_columns = []
             for row in all_rows:
-                display_value = self.get_display_value(row, row_field, model_class)
-                display_rows.append(display_value)
-                transposed_dict[display_value] = {"total": 0}
+                display_info = self.get_display_value(row, row_field, model_class)
+                composite_key = display_info["composite_key"]
+                display_rows.append(composite_key)
+                transposed_dict[composite_key] = {
+                    "total": 0,
+                    "_display": display_info["display"],
+                    "_id": display_info["id"],
+                }
                 for col in all_columns:
-                    col_display = self.get_display_value(col, col_field, model_class)
-                    if col_display not in display_columns:
-                        display_columns.append(col_display)
+                    col_info = self.get_display_value(col, col_field, model_class)
+                    col_composite = col_info["composite_key"]
+                    if col_composite not in display_columns:
+                        display_columns.append(col_composite)
                     value = pivot_dict.get(row, {}).get(col, 0)
-                    transposed_dict[display_value][col_display] = value
-                    transposed_dict[display_value]["total"] += value
+                    transposed_dict[composite_key][col_composite] = value
+                    transposed_dict[composite_key]["total"] += value
 
             # Compute aggregate columns
             aggregate_columns = []
@@ -747,7 +773,9 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
                 # Add aggregate values to transposed_dict
                 for row in all_rows:
                     display_value = self.get_display_value(row, row_field, model_class)
-                    transposed_dict[display_value][aggregate_column_name] = (
+                    display_info = self.get_display_value(row, row_field, model_class)
+                    composite_key = display_info["composite_key"]
+                    transposed_dict[composite_key][aggregate_column_name] = (
                         aggregate_data.get(row, 0)
                     )
                 display_columns.append(aggregate_column_name)
@@ -800,35 +828,50 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
             multi_level_columns = []
 
             for col_tuple in pivot_table.columns:
-                col1_display = self.get_display_value(
+                col1_info = self.get_display_value(
                     col_tuple[0], col_field1, model_class
                 )
-                col2_display = self.get_display_value(
+                col2_info = self.get_display_value(
                     col_tuple[1], col_field2, model_class
                 )
-                column_key = f"{col1_display}|{col2_display}"
+                col1_composite = col1_info["composite_key"]
+                col2_composite = col2_info["composite_key"]
+                column_key = f"{col1_composite}|{col2_composite}"
                 multi_level_columns.append(column_key)
                 column_hierarchy.append(
-                    {"level1": col1_display, "level2": col2_display, "key": column_key}
+                    {
+                        "level1": col1_composite,
+                        "level1_display": col1_info["display"],
+                        "level2": col2_composite,
+                        "level2_display": col2_info["display"],
+                        "key": column_key,
+                    }
                 )
 
             # Convert row data
             display_rows = []
             for row in all_rows:
-                display_value = self.get_display_value(row, row_field, model_class)
-                display_rows.append(display_value)
-                transposed_dict[display_value] = {"total": 0}
+                row_info = self.get_display_value(row, row_field, model_class)
+                row_composite = row_info["composite_key"]
+                display_rows.append(row_composite)
+                transposed_dict[row_composite] = {
+                    "total": 0,
+                    "_display": row_info["display"],
+                    "_id": row_info["id"],
+                }
                 for col_tuple in pivot_table.columns:
-                    col1_display = self.get_display_value(
+                    col1_info = self.get_display_value(
                         col_tuple[0], col_field1, model_class
                     )
-                    col2_display = self.get_display_value(
+                    col2_info = self.get_display_value(
                         col_tuple[1], col_field2, model_class
                     )
-                    column_key = f"{col1_display}|{col2_display}"
+                    col1_composite = col1_info["composite_key"]
+                    col2_composite = col2_info["composite_key"]
+                    column_key = f"{col1_composite}|{col2_composite}"
                     value = pivot_dict.get(row, {}).get(col_tuple, 0)
-                    transposed_dict[display_value][column_key] = value
-                    transposed_dict[display_value]["total"] += value
+                    transposed_dict[row_composite][column_key] = value
+                    transposed_dict[row_composite]["total"] += value
 
             # Compute aggregate columns
             aggregate_columns = []
@@ -859,15 +902,18 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
 
                 # Add aggregate values to transposed_dict
                 for row in all_rows:
-                    display_value = self.get_display_value(row, row_field, model_class)
-                    transposed_dict[display_value][aggregate_column_name] = (
+                    row_info = self.get_display_value(row, row_field, model_class)
+                    row_composite = row_info["composite_key"]
+                    transposed_dict[row_composite][aggregate_column_name] = (
                         aggregate_data.get(row, 0)
                     )
                 multi_level_columns.append(aggregate_column_name)
                 column_hierarchy.append(
                     {
                         "level1": aggregate_column_name,
+                        "level1_display": aggregate_column_name,
                         "level2": "",
+                        "level2_display": "",
                         "key": aggregate_column_name,
                     }
                 )
@@ -955,11 +1001,14 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
                 )
 
             for primary_value, primary_df in primary_groups:
-                primary_display = self.get_display_value(
+                primary_info = self.get_display_value(
                     primary_value, primary_group, model_class
                 )
+                primary_composite = primary_info["composite_key"]
                 group_data = {
-                    "primary_group": primary_display,
+                    "primary_group": primary_composite,
+                    "primary_group_display": primary_info["display"],
+                    "primary_group_id": primary_info["id"],
                     "items": [],
                     "subtotal": 0,
                 }
@@ -967,12 +1016,15 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
                 # Group by secondary group within primary group
                 secondary_groups = primary_df.groupby(secondary_group)
                 for secondary_value, secondary_df in secondary_groups:
-                    secondary_display = self.get_display_value(
+                    secondary_info = self.get_display_value(
                         secondary_value, secondary_group, model_class
                     )
+                    secondary_composite = secondary_info["composite_key"]
                     count_value = len(secondary_df)
                     item_data = {
-                        "secondary_group": secondary_display,
+                        "secondary_group": secondary_composite,
+                        "secondary_group_display": secondary_info["display"],
+                        "secondary_group_id": secondary_info["id"],
                         "values": {"Count": count_value},
                         "total": count_value,
                     }
@@ -1013,10 +1065,13 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
 
             # Get unique column values for headers
             unique_cols = df[col_field].unique().tolist()
-            display_cols = [
-                self.get_display_value(col, col_field, model_class)
-                for col in unique_cols
-            ]
+            display_cols = []
+            col_mapping = {}
+            for col in unique_cols:
+                col_info = self.get_display_value(col, col_field, model_class)
+                col_composite = col_info["composite_key"]
+                display_cols.append(col_composite)
+                col_mapping[col] = col_composite
 
             # Compute aggregate columns
             aggregate_columns = []
@@ -1071,34 +1126,38 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
             grand_total = 0
 
             for primary_value, primary_df in primary_groups:
-                primary_display = self.get_display_value(
+                primary_info = self.get_display_value(
                     primary_value, primary_group, model_class
                 )
+                primary_composite = primary_info["composite_key"]
                 group_data = {
-                    "primary_group": primary_display,
+                    "primary_group": primary_composite,
+                    "primary_group_display": primary_info["display"],
+                    "primary_group_id": primary_info["id"],
                     "items": [],
                     "subtotal": 0,
                 }
 
                 secondary_groups = primary_df.groupby(secondary_group)
                 for secondary_value, secondary_df in secondary_groups:
-                    secondary_display = self.get_display_value(
+                    secondary_info = self.get_display_value(
                         secondary_value, secondary_group, model_class
                     )
+                    secondary_composite = secondary_info["composite_key"]
                     item_data = {
-                        "secondary_group": secondary_display,
+                        "secondary_group": secondary_composite,
+                        "secondary_group_display": secondary_info["display"],
+                        "secondary_group_id": secondary_info["id"],
                         "values": {},
                         "total": 0,
                     }
 
                     # Compute counts for column groups
                     for col_value in unique_cols:
-                        col_display = self.get_display_value(
-                            col_value, col_field, model_class
-                        )
+                        col_composite = col_mapping[col_value]
                         filtered_df = secondary_df[secondary_df[col_field] == col_value]
                         value = len(filtered_df)
-                        item_data["values"][col_display] = value
+                        item_data["values"][col_composite] = value
                         item_data["total"] += value
 
                     # Add aggregate values
@@ -1201,31 +1260,38 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
 
             level1_groups = df.groupby(level1_field)
             for level1_value, level1_df in level1_groups:
-                level1_display = self.get_display_value(
+                level1_info = self.get_display_value(
                     level1_value, level1_field, model_class
                 )
+                level1_composite = level1_info["composite_key"]
                 level1_data = {
-                    "level1_group": level1_display,
+                    "level1_group": level1_composite,
+                    "level1_group_display": level1_info["display"],
+                    "level1_group_id": level1_info["id"],
                     "level2_groups": [],
                     "level1_total": 0,
                 }
 
                 level2_groups = level1_df.groupby(level2_field)
                 for level2_value, level2_df in level2_groups:
-                    level2_display = self.get_display_value(
+                    level2_info = self.get_display_value(
                         level2_value, level2_field, model_class
                     )
+                    level2_composite = level2_info["composite_key"]
                     level2_data = {
-                        "level2_group": level2_display,
+                        "level2_group": level2_composite,
+                        "level2_group_display": level2_info["display"],
+                        "level2_group_id": level2_info["id"],
                         "level3_items": [],
                         "level2_total": 0,
                     }
 
                     level3_groups = level2_df.groupby(level3_field)
                     for level3_value, level3_df in level3_groups:
-                        level3_display = self.get_display_value(
+                        level3_info = self.get_display_value(
                             level3_value, level3_field, model_class
                         )
+                        level3_composite = level3_info["composite_key"]
                         count_value = len(level3_df)
                         aggregate_values = {
                             agg["name"]: aggregate_data[agg["name"]].get(
@@ -1235,7 +1301,9 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
                         }
 
                         level3_item = {
-                            "level3_group": level3_display,
+                            "level3_group": level3_composite,
+                            "level3_group_display": level3_info["display"],
+                            "level3_group_id": level3_info["id"],
                             "count": count_value,
                             "aggregate_values": aggregate_values,
                         }
@@ -1265,17 +1333,34 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
             if hasattr(field, "related_model") and field.related_model:
                 try:
                     related_obj = field.related_model.objects.get(pk=value)
-                    return str(related_obj)
+                    return {
+                        "display": str(related_obj),
+                        "id": related_obj.pk,
+                        "composite_key": f"{str(related_obj)}||{related_obj.pk}",
+                    }
                 except field.related_model.DoesNotExist:
-                    return f"Unknown ({value})"
+                    return {
+                        "display": f"Unknown ({value})",
+                        "id": value,
+                        "composite_key": f"Unknown ({value})",
+                    }
             if hasattr(field, "choices") and field.choices:
                 choice_dict = dict(field.choices)
-                return choice_dict.get(value, value)
+                display = choice_dict.get(value, value)
+                return {"display": display, "id": value, "composite_key": str(display)}
             if value is None or value == "":
-                return "Unspecified (-)"
-            return str(value)
+                return {
+                    "display": "Unspecified (-)",
+                    "id": None,
+                    "composite_key": "Unspecified (-)",
+                }
+            return {"display": str(value), "id": value, "composite_key": str(value)}
         except:
-            return str(value) if value is not None else "Unspecified (-)"
+            return {
+                "display": str(value) if value is not None else "Unspecified (-)",
+                "id": value,
+                "composite_key": str(value) if value is not None else "Unspecified (-)",
+            }
 
     def generate_chart_data(self, df, report):
         chart_data = {
@@ -1317,23 +1402,19 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
 
             else:
                 # Handle single-dimension charts
-                # Priority: chart_field -> first row group -> first column group
                 chart_field = None
 
-                # First, check if chart_field is set and exists in the dataframe
                 if (
                     hasattr(report, "chart_field")
                     and report.chart_field
                     and report.chart_field in df.columns
                 ):
                     chart_field = report.chart_field
-                # Fallback to first row group if available
                 elif report.row_groups_list and report.row_groups_list[0] in df.columns:
                     chart_field = report.row_groups_list[0]
                     if not report.chart_field:
                         report.chart_field = chart_field
                         report.save(update_fields=["chart_field"])
-                # Fallback to first column group if available
                 elif (
                     report.column_groups_list
                     and report.column_groups_list[0] in df.columns
@@ -1345,10 +1426,33 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
 
                 if chart_field:
                     grouped = df.groupby(chart_field).size()
-                    chart_data["labels"] = [
-                        str(self.get_display_value(k, chart_field, model_class))
-                        for k in grouped.index
-                    ]
+
+                    # Create unique labels with counter for duplicates
+                    display_labels = []
+                    display_count = {}
+
+                    for k in grouped.index:
+                        display_info = self.get_display_value(
+                            k, chart_field, model_class
+                        )
+                        if isinstance(display_info, dict):
+                            base_display = display_info["display"]
+                        else:
+                            base_display = str(display_info)
+
+                        # Track duplicates and add counter
+                        if base_display in display_count:
+                            display_count[base_display] += 1
+                            unique_label = (
+                                f"{base_display} ({display_count[base_display]})"
+                            )
+                        else:
+                            display_count[base_display] = 1
+                            unique_label = base_display
+
+                        display_labels.append(unique_label)
+
+                    chart_data["labels"] = display_labels
                     chart_data["data"] = [float(v) for v in grouped.values]
                     chart_data["label_field"] = self.get_verbose_name(
                         chart_field, model_class
@@ -1367,7 +1471,6 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
                         urls.append(f"{section_info['url']}?{query}")
                     chart_data["urls"] = urls
                 else:
-                    # If no field is available, show total records
                     chart_data["labels"] = ["Records"]
                     chart_data["data"] = [len(df)]
                     chart_data["label_field"] = "Records"
@@ -1394,7 +1497,6 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
             ):
                 primary_field = report.chart_field
 
-                # Check if chart_field_stacked is set and valid
                 if (
                     hasattr(report, "chart_field_stacked")
                     and report.chart_field_stacked
@@ -1410,7 +1512,6 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
                 and report.chart_field_stacked in df.columns
             ):
                 secondary_field = report.chart_field_stacked
-                # Find primary field from available groups
                 all_fields = report.row_groups_list + report.column_groups_list
                 primary_field = next(
                     (f for f in all_fields if f != secondary_field and f in df.columns),
@@ -1419,7 +1520,6 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
 
             # Priority 3: Fallback to existing logic if no explicit fields are set
             if not primary_field or not secondary_field:
-                # Use first available combination
                 if report.row_groups_list and report.column_groups_list:
                     if not primary_field:
                         primary_field = report.row_groups_list[0]
@@ -1442,6 +1542,17 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
             if primary_field not in df.columns or secondary_field not in df.columns:
                 return self._fallback_chart_data(df, report, model_class)
 
+            # Save chart fields if not already set
+            fields_to_update = []
+            if not report.chart_field:
+                report.chart_field = primary_field
+                fields_to_update.append("chart_field")
+            if not report.chart_field_stacked:
+                report.chart_field_stacked = secondary_field
+                fields_to_update.append("chart_field_stacked")
+            if fields_to_update:
+                report.save(update_fields=fields_to_update)
+
             # Create pivot table for stacked data
             try:
                 pivot_table = pd.pivot_table(
@@ -1457,24 +1568,55 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
             if pivot_table.empty:
                 return self._fallback_chart_data(df, report, model_class)
 
-            # Prepare categories (x-axis labels)
+            # Prepare categories (x-axis labels) with unique names for duplicates
             categories = []
-            for idx in pivot_table.index:
-                display_val = self.get_display_value(idx, primary_field, model_class)
-                categories.append(str(display_val))
+            category_count = {}
 
-            # Prepare series data (stacked segments)
+            for idx in pivot_table.index:
+                display_info = self.get_display_value(idx, primary_field, model_class)
+                if isinstance(display_info, dict):
+                    base_display = display_info["display"]
+                else:
+                    base_display = str(display_info)
+
+                # Track duplicates and add counter
+                if base_display in category_count:
+                    category_count[base_display] += 1
+                    unique_label = f"{base_display} ({category_count[base_display]})"
+                else:
+                    category_count[base_display] = 1
+                    unique_label = base_display
+
+                categories.append(unique_label)
+
+            # Prepare series data (stacked segments) with unique names for duplicates
             series = []
+            series_name_count = {}
+
             for col in pivot_table.columns:
-                col_display = str(
-                    self.get_display_value(col, secondary_field, model_class)
+                col_display_info = self.get_display_value(
+                    col, secondary_field, model_class
                 )
+                if isinstance(col_display_info, dict):
+                    base_col_display = col_display_info["display"]
+                else:
+                    base_col_display = str(col_display_info)
+
+                # Track duplicates and add counter
+                if base_col_display in series_name_count:
+                    series_name_count[base_col_display] += 1
+                    col_display = (
+                        f"{base_col_display} ({series_name_count[base_col_display]})"
+                    )
+                else:
+                    series_name_count[base_col_display] = 1
+                    col_display = base_col_display
+
                 series_data = []
 
                 for idx in pivot_table.index:
                     try:
                         value = pivot_table.loc[idx, col]
-                        # Ensure value is numeric
                         series_data.append(int(value) if pd.notna(value) else 0)
                     except Exception as val_error:
                         logger.error(
@@ -1493,8 +1635,6 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
             section_info = get_section_info_for_model(model_class)
             urls = []
             for idx in pivot_table.index:
-                from urllib.parse import urlencode
-
                 query = urlencode(
                     {
                         "section": section_info["section"],
@@ -1532,7 +1672,6 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
     def _fallback_chart_data(self, df, report, model_class):
         """Fallback to simple chart when stacking fails"""
 
-        # Find the best field for fallback
         fallback_field = None
         if (
             hasattr(report, "chart_field")
@@ -1550,10 +1689,32 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
         if fallback_field:
             try:
                 grouped = df.groupby(fallback_field).size()
+
+                # Create unique labels with counter for duplicates
+                display_labels = []
+                display_count = {}
+
+                for k in grouped.index:
+                    display_info = self.get_display_value(
+                        k, fallback_field, model_class
+                    )
+                    if isinstance(display_info, dict):
+                        base_display = display_info["display"]
+                    else:
+                        base_display = str(display_info)
+
+                    # Track duplicates and add counter
+                    if base_display in display_count:
+                        display_count[base_display] += 1
+                        unique_label = f"{base_display} ({display_count[base_display]})"
+                    else:
+                        display_count[base_display] = 1
+                        unique_label = base_display
+
+                    display_labels.append(unique_label)
+
                 urls = []
                 for value in grouped.index:
-                    from urllib.parse import urlencode
-
                     query = urlencode(
                         {
                             "section": section_info["section"],
@@ -1564,11 +1725,9 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
                         }
                     )
                     urls.append(f"{section_info['url']}?{query}")
+
                 return {
-                    "labels": [
-                        str(self.get_display_value(k, fallback_field, model_class))
-                        for k in grouped.index
-                    ],
+                    "labels": display_labels,
                     "data": [float(v) for v in grouped.values],
                     "urls": urls,
                     "stacked_data": {},
@@ -1581,8 +1740,8 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
         # Ultimate fallback
         return {
             "labels": ["Records"],
-            "urls": [section_info["url"]],
             "data": [len(df)],
+            "urls": [section_info["url"]],
             "stacked_data": {},
             "label_field": "Records",
             "has_stacked_data": False,
@@ -1605,7 +1764,7 @@ class ReportDetailFilteredView(LoginRequiredMixin, View):
         report = Report.objects.get(pk=pk)
 
         model_class = report.model_class
-        section = get_section_info_for_model(self, model_class)
+        section = get_section_info_for_model(model_class)
         section_value = section["section"]
         query_params["section"] = section_value
         query_string = urlencode(query_params)
@@ -1750,13 +1909,27 @@ class ReportDetailFilteredView(LoginRequiredMixin, View):
             try:
                 field = model._meta.get_field(field_name)
                 if isinstance(field, ForeignKey):
-                    # For foreign keys, filter by the related model's display field
+                    if isinstance(value, str) and "||" in value:
+                        parts = value.split("||")
+                        if len(parts) == 2:
+                            try:
+                                pk_value = int(parts[1])
+                                related_model = field.related_model
+                                try:
+                                    return related_model.objects.get(pk=pk_value)
+                                except related_model.DoesNotExist:
+                                    logger.warning(
+                                        f"Related object not found with pk={pk_value}"
+                                    )
+                                    return None
+                            except (ValueError, TypeError):
+                                value = parts[0]  # Use display part for lookup
+
                     related_model = field.related_model
                     lookup_fields = get_dynamic_lookup_fields(related_model, field_name)
 
                     for lookup_field in lookup_fields:
                         try:
-                            # First try exact match
                             related_obj = related_model.objects.get(
                                 **{lookup_field: value}
                             )
@@ -1787,6 +1960,11 @@ class ReportDetailFilteredView(LoginRequiredMixin, View):
                             continue
                     return None
                 elif field.choices:
+                    # Check if value is a composite key for choices
+                    if isinstance(value, str) and "||" in value:
+                        parts = value.split("||")
+                        value = parts[0]  # Use display part
+
                     choice_map = {
                         display.lower(): value for value, display in field.choices
                     }
@@ -1794,7 +1972,27 @@ class ReportDetailFilteredView(LoginRequiredMixin, View):
                     if normalized_value in choice_map:
                         return choice_map[normalized_value]
                     return value  # Fallback to original value if no match
-                return value
+                else:
+                    # For non-FK fields, check if it's a composite key and extract the value
+                    if isinstance(value, str) and "||" in value:
+                        parts = value.split("||")
+                        # For non-FK fields, try to convert to appropriate type
+                        try:
+                            if hasattr(field, "get_internal_type"):
+                                field_type = field.get_internal_type()
+                                if field_type in [
+                                    "IntegerField",
+                                    "BigIntegerField",
+                                    "SmallIntegerField",
+                                ]:
+                                    return int(parts[1])
+                                elif field_type in ["FloatField", "DecimalField"]:
+                                    return float(parts[1])
+                        except (ValueError, TypeError, IndexError):
+                            pass
+                        # If conversion fails, use the display part
+                        value = parts[0]
+                    return value
             except Exception as e:
                 logger.error(
                     f"Error resolving filter value for {field_name}={value}: {e}"
@@ -1861,7 +2059,8 @@ class ReportDetailFilteredView(LoginRequiredMixin, View):
         list_view.clear_session_button_enabled = False
         list_view.list_column_visibility = False
         list_view.table_height_as_class = "h-[200px]"
-        list_view.col_attrs = self.col_attrs()
+        if hasattr(report.model_class, "get_detail_url"):
+            list_view.col_attrs = self.col_attrs()
         sort_field = self.request.GET.get("sort")
         sort_direction = self.request.GET.get("direction", "asc")
         if sort_field:
@@ -3000,6 +3199,7 @@ class RemoveColumnGroupView(LoginRequiredMixin, View):
     name="dispatch",
 )
 class RemoveAggregateColumnView(LoginRequiredMixin, View):
+
     @method_decorator(require_POST)
     def dispatch(self, *args, **kwargs):
         return super().dispatch(*args, **kwargs)
@@ -3178,6 +3378,7 @@ class ChangeChartTypeView(LoginRequiredMixin, HorillaSingleFormView):
     fields = ["chart_type"]
     modal_height = False
     full_width_fields = ["chart_type"]
+    form_class = ChangeChartReportForm
 
     @cached_property
     def form_url(self):
@@ -3206,13 +3407,11 @@ class ChangeChartFieldView(LoginRequiredMixin, HorillaSingleFormView):
         session_key = f"report_preview_{report.pk}"
         preview_data = self.request.session.get(session_key, {})
 
-        # Create a temporary report object with preview data if available
         if preview_data:
             temp_report = self.create_temp_report(report, preview_data)
         else:
             temp_report = report
 
-        # Get grouping fields (row_groups and column_groups)
         field_choices = []
 
         # Add row groups to choices
@@ -3234,13 +3433,6 @@ class ChangeChartFieldView(LoginRequiredMixin, HorillaSingleFormView):
                 field_choices.append(
                     (field_name, f"{field_name.title()} (Column Group)")
                 )
-
-        # If no grouping fields are available, fall back to choice fields
-        if not field_choices:
-            choice_fields = temp_report.get_choice_fields()
-            field_choices = [
-                (field["name"], field["verbose_name"]) for field in choice_fields
-            ]
 
         # Add empty choice for clearing the field
         field_choices.insert(0, ("", "-- Select Chart Field --"))

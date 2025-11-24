@@ -90,7 +90,7 @@ class HorillaContentType(ContentType):
         return self.model.replace("_", " ").title()
 
 
-@feature_enabled(all=True, exclude=["dashboard_component"])
+@feature_enabled(all=True, exclude=["dashboard_component", "report_choices"])
 class Company(models.Model):
     """
     Company model representing business entities in the system.
@@ -490,7 +490,7 @@ class HorillaCoreModel(models.Model):
         )
 
 
-@feature_enabled(all=True, exclude=["dashboard_component"])
+@feature_enabled(all=True, exclude=["dashboard_component", "report_choices"])
 class Department(HorillaCoreModel):
     """
     Department model
@@ -530,7 +530,7 @@ class Department(HorillaCoreModel):
         )
 
 
-@feature_enabled(all=True, exclude=["dashboard_component"])
+@feature_enabled(all=True, exclude=["dashboard_component", "report_choices"])
 class Role(HorillaCoreModel):
     """
     Role model
@@ -774,7 +774,7 @@ class MultipleCurrency(HorillaCoreModel):
         return reverse_lazy("horilla_core:delete_currency", kwargs={"pk": self.pk})
 
 
-@feature_enabled(all=True, exclude=["dashboard_component"])
+@feature_enabled(all=True, exclude=["dashboard_component", "report_choices"])
 class HorillaUser(AbstractUser):
     """
     Represents a custom user profile for the Horilla application, extending Django's AbstractUser.
@@ -1023,6 +1023,14 @@ class HorillaSwitchCompany(models.Model):
         default_permissions = ()
         permissions = (("can_switch_company", "Can Switch Company"),)
         verbose_name = _("Switch Company")
+
+
+class HorillaAboutSystem(models.Model):
+    class Meta:
+        managed = False
+        default_permissions = ()
+        permissions = (("can_view_horilla_about_system", "Can View About System"),)
+        verbose_name = _("About System")
 
 
 @permission_exempt_model

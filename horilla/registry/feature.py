@@ -13,6 +13,7 @@ def feature_enabled(
     mail_template=False,
     global_search=False,
     dashboard_component=False,
+    report_choices=False,
     exclude=None,
 ):
     """
@@ -21,7 +22,7 @@ def feature_enabled(
     """
 
     def decorator(model_class):
-        nonlocal import_data, export_data, mail_template, global_search, dashboard_component, exclude
+        nonlocal import_data, export_data, mail_template, global_search, dashboard_component, report_choices, exclude
 
         if exclude is None:
             exclude = []
@@ -32,6 +33,7 @@ def feature_enabled(
             mail_template = "mail_template" not in exclude
             global_search = "global_search" not in exclude
             dashboard_component = "dashboard_component" not in exclude
+            report_choices = "report_choices" not in exclude
 
         if import_data and model_class not in FEATURE_REGISTRY["import_models"]:
             FEATURE_REGISTRY["import_models"].append(model_class)
@@ -56,6 +58,9 @@ def feature_enabled(
             and model_class not in FEATURE_REGISTRY["dashboard_component_models"]
         ):
             FEATURE_REGISTRY["dashboard_component_models"].append(model_class)
+
+        if report_choices and model_class not in FEATURE_REGISTRY["report_models"]:
+            FEATURE_REGISTRY["report_models"].append(model_class)
 
         return model_class
 

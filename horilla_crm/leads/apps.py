@@ -20,6 +20,10 @@ class LeadsConfig(AppConfig):
         "order": 2,
     }
 
+    report_files = [
+        "report_data/reports.json",
+    ]
+
     def get_api_paths(self):
         """
         Return API path configurations for this app.

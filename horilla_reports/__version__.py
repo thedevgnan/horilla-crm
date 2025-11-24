@@ -1,0 +1,5 @@
+__version__ = "1.0.0"
+__module_name__ = "Reports"
+__release_date__ = ""
+__description__ = "Module for creating and customizing reports across all system modules."
+__icon__ = "assets/icons/icon5.svg"

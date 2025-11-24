@@ -16,6 +16,7 @@
                     hx-select-oob="#sideMenuContainer"
                     hx-swap="outerHTML"
                     hx-select="#mainContent"
+                    hx-indicator="none"
                     hx-push-url="true" >
                     <i class="fas fa-arrow-left mr-2"></i>
                 </button>
@@ -122,7 +123,7 @@
         <div class="flex p-5 pt-24" id="report-content">
             <div class="sec1" style="flex: 1 0">
                 {% if has_unsaved_changes %}
-                    <div class="bg-primary-100 border border-primary-500 rounded-lg p-3 mb-4">
+                    <div class="bg-primary-300 rounded-lg p-3 mb-3">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
                                 <svg class="h-5 w-5 text-primary-600" viewBox="0 0 20 20" fill="currentColor">
@@ -169,27 +170,45 @@
                                     </button>
                                     <div class="dropdown-content absolute z-10 bg-white rounded-lg [box-shadow:0px_0px_20px_0px_rgb(0_0_0_/_8%)] min-w-[150px] py-2 right-0">
                                         <ul class="text-sm z-50 relative" aria-labelledby="dropdownLeftEndButton">
-                                            <li><a href="#" class="block px-3 py-1.5 hover:text-primary-600 transition duration-300 text-[.8rem]"
-                                                  hx-get="{% url 'horilla_reports:change_chart_type' report.pk %}"
+                                            <li>
+                                                <a href="#" class="block px-3 py-1.5 hover:text-primary-600 transition duration-300 text-[.8rem]"
+                                                  hx-get="{% url 'horilla_reports:change_chart_type' report.pk %}?total={{total_groups_count}}"
                                                   hx-on:click="openModal();"
                                                   hx-target="#modalBox"
                                                   hx-swap="innerHTML"
-                                                  >{% trans 'Change Chart' %}</a></li>
-                                                  <li><a href="#" class="block px-3 py-1.5 hover:text-primary-600 transition duration-300 text-[.8rem]"
-                                                    hx-get="{% url 'horilla_reports:change_chart_field' report.pk %}"
-                                                    hx-on:click="openModal();"
-                                                    hx-target="#modalBox"
-                                                    hx-swap="innerHTML"
-                                                    >{% trans 'Change Field' %}</a></li>
-                                                <li><a href="#" class="block px-3 py-1.5 hover:text-primary-600 transition duration-300 text-[.8rem]"
-                                                        onclick="exportChartAsPDF('chart-{{ report.pk }}', 'report_{{ report.pk }}')">Export as PDF</a></li>
-                                                  <li><a href="#" class="block px-3 py-1.5 hover:text-primary-600 transition duration-300 text-[.8rem]"
-                                                        onclick="EChartsConfig.exportChart(window.reportChartInstance_{{ report.pk }}, 'report_{{ report.pk }}', 'png')">Export as PNG</a></li>
-                                            <li><a href="#" class="block px-3 py-1.5 hover:text-primary-600 transition duration-300 text-[.8rem]"
-                                                hx-get="{% url 'horilla_dashboard:report_to_dashboard' %}?report_id={{report.pk}}"
-                                                hx-on:click="openModal();"
-                                                hx-target="#modalBox"
-                                                hx-swap="innerHTML">{% trans "Add to Dashboard" %}</a></li>
+                                                  >{% trans 'Change Chart' %}
+                                                </a>
+                                            </li>
+                                            {% if total_groups_count > 1 %}
+                                                <li>
+                                                    <a href="#" class="block px-3 py-1.5 hover:text-primary-600 transition duration-300 text-[.8rem]"
+                                                        hx-get="{% url 'horilla_reports:change_chart_field' report.pk %}"
+                                                        hx-on:click="openModal();"
+                                                        hx-target="#modalBox"
+                                                        hx-swap="innerHTML"
+                                                    >{% trans 'Change Field' %}</a>
+                                                </li>
+                                            {% endif %}
+                                            <li>
+                                                <a href="#" class="block px-3 py-1.5 hover:text-primary-600 transition duration-300 text-[.8rem]"
+                                                    onclick="exportChartAsPDF('chart-{{ report.pk }}', 'report_{{ report.pk }}')">Export as PDF
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="#" class="block px-3 py-1.5 hover:text-primary-600 transition duration-300 text-[.8rem]"
+                                                    onclick="EChartsConfig.exportChart(window.reportChartInstance_{{ report.pk }}, 'report_{{ report.pk }}', 'png')">Export as PNG
+                                                </a>
+                                            </li>
+                                            {% if total_groups_count > 0 %}
+                                                <li>
+                                                    <a href="#" class="block px-3 py-1.5 hover:text-primary-600 transition duration-300 text-[.8rem]"
+                                                        hx-get="{% url 'horilla_dashboard:report_to_dashboard' %}?report_id={{report.pk}}"
+                                                        hx-on:click="openModal();"
+                                                        hx-target="#modalBox"
+                                                        hx-swap="innerHTML">{% trans "Add to Dashboard" %}
+                                                    </a>
+                                                </li>
+                                            {% endif %}
                                         </ul>
                                     </div>
                                 </div>

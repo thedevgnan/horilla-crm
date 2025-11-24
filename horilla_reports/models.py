@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 
 from horilla.registry.feature import feature_enabled
 from horilla_core.models import HorillaContentType, HorillaCoreModel
+from horilla_reports.methods import limit_content_types
 from horilla_utils.methods import render_template
 
 
@@ -92,15 +93,7 @@ class Report(HorillaCoreModel):
         HorillaContentType,
         on_delete=models.CASCADE,
         verbose_name=_("Module"),
-        limit_choices_to={
-            "model__in": [
-                "account",
-                "contact",
-                "lead",
-                "campaign",
-                "opportunity",
-            ]
-        },
+        limit_choices_to=limit_content_types,
     )
     folder = models.ForeignKey(
         ReportFolder,
