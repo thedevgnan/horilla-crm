@@ -1,12 +1,13 @@
 import re
 from functools import reduce
 from operator import or_
-from urllib.parse import unquote, urlencode
+from urllib.parse import parse_qs, unquote, urlencode, urlparse, urlunparse
 
 from django.apps import apps
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import CharField, ForeignKey, ManyToManyField, Q, TextField
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse_lazy
 from django.utils.safestring import mark_safe
@@ -17,7 +18,7 @@ from horilla_generics.views import HorillaListView
 from horilla_utils.methods import get_section_info_for_model
 
 
-class GlobalSearchView(View):
+class GlobalSearchView(LoginRequiredMixin, View):
     template_name = "global_search.html"
     include_models = FEATURE_REGISTRY.get("global_search_models", [])
 
@@ -320,7 +321,7 @@ class GlobalSearchView(View):
         list_view.list_column_visibility = False
         list_view.columns = config["columns"]
 
-        if config["columns"]:
+        if config["columns"] and hasattr(model, "get_detail_url"):
             first_column_field = config["columns"][0][1]
             htmx_attrs = self.get_col_attrs_for_model(model_name, request)
             list_view.col_attrs = [
@@ -361,18 +362,14 @@ class GlobalSearchView(View):
             try:
                 previous_url = unquote(unquote(previous_url))
 
-                # Remove section parameter from previous_url
                 if "?" in previous_url:
-                    from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
                     parsed = urlparse(previous_url)
                     query_params = parse_qs(parsed.query)
 
-                    # Remove 'section' parameter if it exists
                     if "section" in query_params:
                         del query_params["section"]
 
-                    # Rebuild query string
                     new_query = urlencode(query_params, doseq=True)
                     previous_url = urlunparse(
                         (
@@ -396,9 +393,18 @@ class GlobalSearchView(View):
                 previous_url = request.session.get("pre_search_url", "/")
 
         if not query:
-            response = HttpResponse()
-            response["HX-Redirect"] = previous_url
-            return response
+            section = request.GET.get("section")
+            if section:
+                # Add section back to previous_url
+                if "?" in previous_url:
+                    previous_url += f"&section={section}"
+                else:
+                    previous_url += f"?section={section}"
+            if request.headers.get("HX-Request"):
+                response = HttpResponse()
+                response["HX-Redirect"] = previous_url
+                return response
+            return redirect(previous_url)
 
         if request.headers.get("HX-Request"):
             tab_model = request.GET.get("tab_model")
@@ -432,10 +438,8 @@ class GlobalSearchView(View):
                 for field in config["search_fields"]:
                     q_objects |= Q(**{f"{field}__icontains": query})
 
-                # Apply search filter
                 results = model.objects.filter(q_objects)
 
-                # Apply permission-based filtering
                 results = self.get_filtered_queryset(model, results, request)
 
                 search_results[model_name] = results

@@ -43,7 +43,6 @@ from django.utils import timezone, translation
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
-from django.views.decorators.http import require_POST
 from django.views.generic import (
     DeleteView,
     DetailView,
@@ -3038,8 +3037,18 @@ class HorillaDetailView(DetailView):
         if not self.body:
             return normalized_body
 
+        field_permissions = get_field_permissions_for_model(
+            self.request.user, self.model
+        )
+
         instance = self.model()
         for field in self.body:
+            field_name = field[1] if isinstance(field, tuple) else field
+
+            field_perm = field_permissions.get(field_name, "readwrite")
+            if field_perm == "hidden":
+                continue
+
             if isinstance(field, tuple):
                 normalized_body.append(field)
             else:
@@ -3132,6 +3141,10 @@ class HorillaDetailView(DetailView):
         current_obj = self.get_object()
         current_id = current_obj.id
         context["tab_url"] = self.tab_url
+        field_permissions = get_field_permissions_for_model(
+            self.request.user, self.model
+        )
+        context["field_permissions"] = field_permissions
         if hasattr(self, "final_stage_action"):
             final_stage = self.final_stage_action
             if callable(final_stage):
@@ -3180,20 +3193,15 @@ class HorillaDetailView(DetailView):
         hx_current_url = self.request.headers.get("HX-Current-URL")
         http_referer = self.request.META.get("HTTP_REFERER")
 
-        # Check if this is a reload (same page request)
         is_reload = False
         if hx_current_url:
-            from urllib.parse import urlparse
-
             current_path = urlparse(hx_current_url).path
             is_reload = current_path == self.request.path
 
-        # If it's a reload, use the stored breadcrumbs
         if is_reload:
             stored_breadcrumbs = self.request.session.get(breadcrumbs_session_key)
             if stored_breadcrumbs:
-                # Convert stored breadcrumbs back to proper format
-                # The last item should be the current object, not from session
+
                 breadcrumbs_for_context = (
                     stored_breadcrumbs[:-1] if stored_breadcrumbs else []
                 )
@@ -3208,14 +3216,11 @@ class HorillaDetailView(DetailView):
                     ).verbose_name
                 return context
 
-        # Normal breadcrumb calculation for non-reload requests
         breadcrumbs = []
         stored_referer = self.request.session.get(referer_session_key)
 
         if hx_current_url and not is_reload:
             referer = hx_current_url
-            from urllib.parse import urlparse
-
             referer_path = urlparse(referer).path
             if referer_path != self.request.path:
                 self.request.session[referer_session_key] = referer
@@ -3224,16 +3229,12 @@ class HorillaDetailView(DetailView):
         else:
             referer = http_referer
             if referer:
-                from urllib.parse import urlparse
-
                 referer_path = urlparse(referer).path
                 if referer_path != self.request.path:
                     self.request.session[referer_session_key] = referer
 
         dynamic_breadcrumbs = []
         if referer:
-            from urllib.parse import urlparse
-
             referer_path = urlparse(referer).path
             if referer_path != self.request.path:
                 try:
@@ -3345,13 +3346,26 @@ class HorillaDetailView(DetailView):
 
         dynamic_breadcrumbs.append((current_obj, None))
 
-        # Store breadcrumbs in session (convert model instance to string for JSON serialization)
+        session_url_value = self.request.GET.get("session_url")
+        if session_url_value:
+            updated_breadcrumbs = []
+            for label, url in dynamic_breadcrumbs:
+                if url:
+                    try:
+                        parsed_url = urlparse(url)
+                        query_dict = parse_qs(parsed_url.query)
+                        query_dict["session_url"] = [session_url_value]
+                        new_query = urlencode(query_dict, doseq=True)
+                        url = urlunparse(parsed_url._replace(query=new_query))
+                    except Exception:
+                        pass  # Keep original URL if parsing fails
+                updated_breadcrumbs.append((label, url))
+            dynamic_breadcrumbs = updated_breadcrumbs
+
         self.request.session["detail_view_breadcrumbs"] = breadcrumbs
 
-        # Store breadcrumbs with current object as string (JSON serializable)
         serializable_breadcrumbs = []
         for label, url in dynamic_breadcrumbs:
-            # Convert model instances to strings
             if hasattr(label, "_meta"):  # It's a model instance
                 label = str(label)
             serializable_breadcrumbs.append((label, url))
@@ -4514,6 +4528,10 @@ class HorillaMultiStepFormView(FormView):
     dynamic_create_fields = []
     dynamic_create_field_mapping = {}
     pk_url_kwarg = "pk"
+    permission_required = None
+    check_object_permission = True
+    permission_denied_template = "error/403.html"
+    skip_permission_check = False
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -4521,6 +4539,8 @@ class HorillaMultiStepFormView(FormView):
         self.object = None
 
     def dispatch(self, request, *args, **kwargs):
+        if not self.skip_permission_check and not self.has_permission():
+            return render(request, self.permission_denied_template, {"modal": True})
         pk = kwargs.get(self.pk_url_kwarg)
         if pk:
             try:
@@ -4532,6 +4552,87 @@ class HorillaMultiStepFormView(FormView):
                 )
             self.storage_key = f"{self.__class__.__name__}_form_data_{pk}"
         return super().dispatch(request, *args, **kwargs)
+
+    def get_auto_permissions(self):
+        """
+        Automatically generate the appropriate permission based on create/edit mode.
+        """
+        if not self.model:
+            return []
+
+        app_label = self.model._meta.app_label
+        model_name = self.model._meta.model_name
+
+        # Check if this is edit mode or create mode
+        is_edit_mode = bool(self.kwargs.get("pk"))
+
+        if is_edit_mode:
+            return [f"{app_label}.change_{model_name}"]
+        else:
+            return [f"{app_label}.add_{model_name}"]
+
+    def has_permission(self):
+        """
+        Check if the user has the required permissions.
+        Automatically checks both model permissions and object-level permissions.
+        """
+        user = self.request.user
+
+        permissions = self.permission_required or self.get_auto_permissions()
+
+        if isinstance(permissions, str):
+            permissions = [permissions]
+
+        has_model_permission = any(user.has_perm(perm) for perm in permissions)
+
+        if has_model_permission:
+            return True
+
+        if self.check_object_permission:
+            return self.has_object_permission()
+
+        return False
+
+    def has_object_permission(self):
+        """
+        Check object-level permissions (e.g., ownership) on self.model.
+        Uses model's OWNER_FIELDS attribute to determine ownership.
+        """
+        # Only check on edit mode (when pk exists)
+        if not self.kwargs.get("pk") or not self.model:
+            return False
+
+        try:
+            # Get the object being edited
+            obj = self.model.objects.get(pk=self.kwargs["pk"])
+
+            # First check if model has OWNER_FIELDS attribute
+            if hasattr(self.model, "OWNER_FIELDS"):
+                owner_fields = self.model.OWNER_FIELDS
+                for owner_field in owner_fields:
+                    if hasattr(obj, owner_field):
+                        owner = getattr(obj, owner_field)
+                        if owner == self.request.user:
+                            return True
+
+            # Fallback to common owner field names if OWNER_FIELDS not found
+            fallback_owner_fields = [
+                f"{self.model._meta.model_name}_owner",  # e.g., campaign_owner
+                "owner",
+                "created_by",
+                "user",
+            ]
+
+            for owner_field in fallback_owner_fields:
+                if hasattr(obj, owner_field):
+                    owner = getattr(obj, owner_field)
+                    if owner == self.request.user:
+                        return True
+
+            return False
+
+        except self.model.DoesNotExist:
+            return False
 
     def cleanup_session_data(self):
         """Clean up session data"""
@@ -5086,8 +5187,16 @@ class HorillaSingleFormView(FormView):
     header = True
     modal_height_class = None
     hx_attrs: dict = {}
+    permission_required = None
+    check_object_permission = True
+    permission_denied_template = "error/403.html"
+    skip_permission_check = False
 
     def dispatch(self, request, *args, **kwargs):
+        # Check permissions before processing
+        if not self.skip_permission_check and not self.has_permission():
+            return render(request, self.permission_denied_template, {"modal": True})
+
         if request.headers.get("HX-Request") and "add_condition_row" in request.GET:
             return self.add_condition_row(request)
 
@@ -5100,6 +5209,88 @@ class HorillaSingleFormView(FormView):
                     "<script>$('#reloadButton').click();closeModal();</script>"
                 )
         return super().dispatch(request, *args, **kwargs)
+
+    def get_auto_permissions(self):
+        """
+        Automatically generate the appropriate permission based on create/edit mode.
+        """
+        if not self.model:
+            return []
+
+        app_label = self.model._meta.app_label
+        model_name = self.model._meta.model_name
+
+        # Check if this is edit mode or create mode
+        is_edit_mode = bool(self.kwargs.get("pk"))
+
+        if is_edit_mode:
+            return [f"{app_label}.change_{model_name}"]
+        else:
+            return [f"{app_label}.add_{model_name}"]
+
+    def has_permission(self):
+        """
+        Check if the user has the required permissions.
+        Automatically checks both model permissions and object-level permissions.
+        """
+        user = self.request.user
+
+        # Get permissions to check
+        permissions = self.permission_required or self.get_auto_permissions()
+
+        if isinstance(permissions, str):
+            permissions = [permissions]
+
+        has_model_permission = any(user.has_perm(perm) for perm in permissions)
+
+        if has_model_permission:
+            return True
+
+        if self.check_object_permission:
+            return self.has_object_permission()
+
+        return False
+
+    def has_object_permission(self):
+        """
+        Check object-level permissions (e.g., ownership) on self.model.
+        Uses model's OWNER_FIELDS attribute to determine ownership.
+        """
+        # Only check on edit mode (when pk exists)
+        if not self.kwargs.get("pk") or not self.model:
+            return False
+
+        try:
+            # Get the object being edited
+            obj = self.model.objects.get(pk=self.kwargs["pk"])
+
+            # First check if model has OWNER_FIELDS attribute
+            if hasattr(self.model, "OWNER_FIELDS"):
+                owner_fields = self.model.OWNER_FIELDS
+                for owner_field in owner_fields:
+                    if hasattr(obj, owner_field):
+                        owner = getattr(obj, owner_field)
+                        if owner == self.request.user:
+                            return True
+
+            # Fallback to common owner field names if OWNER_FIELDS not found
+            fallback_owner_fields = [
+                f"{self.model._meta.model_name}_owner",  # e.g., campaign_owner
+                "owner",
+                "created_by",
+                "user",
+            ]
+
+            for owner_field in fallback_owner_fields:
+                if hasattr(obj, owner_field):
+                    owner = getattr(obj, owner_field)
+                    if owner == self.request.user:
+                        return True
+
+            return False
+
+        except self.model.DoesNotExist:
+            return False
 
     def get(self, request, *args, **kwargs):
         if self.kwargs.get("pk"):

@@ -9,9 +9,6 @@
             <div id="field-{{ field_name }}">
               <label for="{{col.0}}-details-tab" class="text-xs text-color-600">
                 {{col.0}}
-                {% if field_perm == "readonly" %}
-                  <span class="text-xs text-gray-400 ml-1">({% trans "Read Only" %})</span>
-                {% endif %}
               </label>
               <div class="relative">
                 <input
@@ -19,11 +16,10 @@
                   id="{{col.0}}-details-tab"
                   name="{{col.0}}_details_tab"
                   value="{% display_field_value obj field_name request.user %}"
-                  class="text-color-600 p-2 placeholder:text-xs font-normal pr-[40px] w-full border border-dark-50 rounded-md mt-1 focus-visible:outline-0 placeholder:text-dark-100 text-sm [transition:.3s] focus:border-primary-600 {% if field_perm == 'readonly' %}bg-gray-50 cursor-not-allowed{% endif %}"
+                  class="text-color-600 p-2 placeholder:text-xs font-normal pr-[40px] w-full border border-dark-50 rounded-md mt-1 focus-visible:outline-0 placeholder:text-dark-100 text-sm [transition:.3s] focus:border-primary-600"
                   readonly
                 />
 
-                {# Show edit button only if field permission is 'readwrite' #}
                 {% if edit_field and field_name not in non_editable_fields and field_perm == "readwrite" %}
                   <button
                     class="absolute right-3 top-0 bottom-0 m-auto cursor-pointer hover:scale-110 transition-transform"
@@ -32,13 +28,6 @@
                     hx-swap="outerHTML">
                     <img src="{% static './assets/icons/edit.svg' %}" alt="Edit" width="13" />
                   </button>
-                {% elif field_perm == "readonly" %}
-                  {# Show lock icon for readonly fields #}
-                  <span class="absolute right-3 top-0 bottom-0 m-auto flex items-center" title="{% trans 'Read Only' %}">
-                    <svg class="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
-                    </svg>
-                  </span>
                 {% endif %}
               </div>
             </div>
@@ -48,35 +37,3 @@
     {% endfor %}
   </div>
 </div>
-
-{% comment %} {% load static i18n %}
-{% load horilla_tags %}
-<div class="h-full overflow-y-auto overflow-hidden custom-scroll p-3">
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    {% for col in body %}
-      <div id="field-{{ col.1 }}">
-        <label for="{{col.0}}-details-tab" class="text-xs text-color-600">{{col.0}}</label>
-        <div class="relative">
-          <input
-            type="text"
-            id="{{col.0}}-details-tab"
-            name="{{col.0}}_details_tab"
-            value="{% display_field_value obj col.1 request.user %}"
-            class="text-color-600 p-2 placeholder:text-xs font-normal pr-[40px] w-full border border-dark-50 rounded-md mt-1 focus-visible:outline-0 placeholder:text-dark-100 text-sm [transition:.3s] focus:border-primary-600"
-            readonly
-          />
-
-          {% if edit_field and col.1 not in non_editable_fields %}
-            <button
-              class="absolute right-3 top-0 bottom-0 m-auto cursor-pointer hover:scale-110 transition-transform"
-              hx-get="{% url 'horilla_generics:edit_field' pk=obj.pk field_name=col.1 app_label=app_label model_name=model_name %}?pipeline_field={{ pipeline_field }}"
-              hx-target="#field-{{ col.1 }}"
-              hx-swap="outerHTML">
-              <img src="{% static './assets/icons/edit.svg' %}" alt="Edit" width="13" />
-            </button>
-          {% endif %}
-        </div>
-      </div>
-    {% endfor %}
-  </div>
-</div> {% endcomment %}
