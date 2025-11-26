@@ -83,6 +83,7 @@ class MailToLeadListView(LoginRequiredMixin, HorillaListView):
     clear_session_button_enabled = False
     table_width = False
     enable_sorting = False
+    table_height = False
     table_height_as_class = "h-[500px]"
     list_column_visibility = False
 

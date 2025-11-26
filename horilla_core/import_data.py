@@ -2537,6 +2537,7 @@ class ImportHistoryView(LoginRequiredMixin, HorillaListView):
     search_url = reverse_lazy("horilla_core:import_history_view")
     main_url = reverse_lazy("horilla_core:import_history_view")
     table_width = False
+    table_height = False
     table_height_as_class = "h-[58vh]"
 
     header_attrs = [

@@ -483,6 +483,7 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
         list_view.bulk_select_option = False
         list_view.clear_session_button_enabled = False
         list_view.list_column_visibility = False
+        list_view.table_height = False
         list_view.table_height_as_class = "h-[200px]"
         if hasattr(report.model_class, "get_detail_url"):
             list_view.col_attrs = self.col_attrs()
@@ -2058,6 +2059,7 @@ class ReportDetailFilteredView(LoginRequiredMixin, View):
         list_view.bulk_select_option = False
         list_view.clear_session_button_enabled = False
         list_view.list_column_visibility = False
+        list_view.table_height = False
         list_view.table_height_as_class = "h-[200px]"
         if hasattr(report.model_class, "get_detail_url"):
             list_view.col_attrs = self.col_attrs()

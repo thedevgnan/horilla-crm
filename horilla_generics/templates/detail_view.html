@@ -93,8 +93,8 @@
         {% endif %}
         {% if tab_url %}
           <div id="tab-session" class="w-full" >
-            <div class="relative [box-shadow:0px_0px_20px_0px_rgb(0_0_0_/_5%)] p-3 bg-white rounded-md">
-              <div hx-get="{{ tab_url }}?{{ request.GET.urlencode}}&object_id={{obj.id}}&pipeline_field={{ pipeline_field }}" hx-trigger="load"></div>
+            <div class="relative  [box-shadow:0px_0px_20px_0px_rgb(0_0_0_/_5%)] p-3 bg-white rounded-md">
+              <div  hx-get="{{ tab_url }}?{{ request.GET.urlencode}}&object_id={{obj.id}}&pipeline_field={{ pipeline_field }}" hx-trigger="load"></div>
             </div>
           </div>
         {% endif %}

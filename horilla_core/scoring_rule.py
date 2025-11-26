@@ -108,6 +108,7 @@ class ScoringRuleListView(LoginRequiredMixin, HorillaListView):
     search_url = reverse_lazy("horilla_core:scoring_rule_list_view")
     main_url = reverse_lazy("horilla_core:scoring_rule_view")
     table_width = False
+    table_height = False
     table_height_as_class = "h-[500px]"
     bulk_select_option = False
     header_attrs = [

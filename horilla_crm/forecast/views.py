@@ -172,7 +172,7 @@ class ForecastTabView(LoginRequiredMixin, HorillaTabView):
 
     view_id = "forecast-tab-view"
     background_class = "rounded-md"
-    tab_class = "h-[500px] overflow-x-auto custom-scroll"
+    tab_class = "h-[calc(_100vh_-_300px_)] overflow-x-auto custom-scroll"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1621,6 +1621,7 @@ class ForecastOpportunitiesView(LoginRequiredMixin, View):
                     ),
                     table_width=False,
                     columns=columns,
+                    table_height=False,
                     table_height_as_class="h-[400px]",
                     bulk_select_option=False,
                     clear_session_button_enabled=False,

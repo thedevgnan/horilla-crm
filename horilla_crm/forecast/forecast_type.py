@@ -90,6 +90,7 @@ class ForecastTypeListView(LoginRequiredMixin, HorillaListView):
     clear_session_button_enabled = False
     table_width = False
     enable_sorting = False
+    table_height = False
     table_height_as_class = "h-[500px]"
 
     @cached_property

@@ -99,6 +99,7 @@ class DepartmentListView(LoginRequiredMixin, HorillaListView):
     table_width = False
     # bulk_select_option = False
     bulk_update_option = False
+    table_height = False
     table_height_as_class = "h-[500px]"
 
     columns = ["department_name", "description"]
