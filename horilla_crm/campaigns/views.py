@@ -171,7 +171,10 @@ class CampaignListView(LoginRequiredMixin, HorillaListView):
         show_actions = (
             self.request.user.is_superuser
             or self.request.user.has_perm("campaigns.change_campaign")
-            or self.get_queryset().filter(campaign_owner=self.request.user).exists()
+            or (
+                self.get_queryset().filter(campaign_owner=self.request.user).exists()
+                and self.request.user.has_perm("campaigns.change_own_campaign")
+            )
         )
 
         if show_actions:
@@ -303,7 +306,10 @@ class CampaignKanbanView(LoginRequiredMixin, HorillaKanbanView):
         show_actions = (
             self.request.user.is_superuser
             or self.request.user.has_perm("campaigns.change_campaign")
-            or self.get_queryset().filter(campaign_owner=self.request.user).exists()
+            or (
+                self.get_queryset().filter(campaign_owner=self.request.user).exists()
+                and self.request.user.has_perm("campaigns.change_own_campaign")
+            )
         )
 
         if show_actions:
@@ -378,24 +384,6 @@ class CampaignFormView(LoginRequiredMixin, HorillaMultiStepFormView):
             return reverse_lazy("campaigns:campaign_edit", kwargs={"pk": pk})
         return reverse_lazy("campaigns:campaign_create")
 
-    def get(self, request, *args, **kwargs):
-        campaign_id = self.kwargs.get("pk")
-        if campaign_id:
-            try:
-                campaign = get_object_or_404(Campaign, pk=campaign_id)
-            except Exception as e:
-                messages.error(request, e)
-                return HttpResponse("<script>$('#reloadButton').click();</script>")
-
-            if campaign.campaign_owner == request.user:
-                return super().get(request, *args, **kwargs)
-
-        if request.user.has_perm("campaigns.change_campaign") or request.user.has_perm(
-            "campaigns.add_campaign"
-        ):
-            return super().get(request, *args, **kwargs)
-        return render(request, "error/403.html")
-
 
 @method_decorator(htmx_required, name="dispatch")
 class CampaignChangeOwnerForm(LoginRequiredMixin, HorillaSingleFormView):
@@ -417,21 +405,6 @@ class CampaignChangeOwnerForm(LoginRequiredMixin, HorillaSingleFormView):
         pk = self.kwargs.get("pk") or self.request.GET.get("id")
         if pk:
             return reverse_lazy("campaigns:campaign_change_owner", kwargs={"pk": pk})
-
-    def get(self, request, *args, **kwargs):
-
-        campaign_id = request.GET.get("id")
-        if request.user.has_perm("campaigns.change_campaign") or request.user.has_perm(
-            "campaigns.add_campaign"
-        ):
-            return super().get(request, *args, **kwargs)
-
-        if campaign_id:
-            campaign = get_object_or_404(Campaign, pk=campaign_id)
-            if campaign.campaign_owner == request.user:
-                return super().get(request, *args, **kwargs)
-
-        return render(request, "error/403.html")
 
 
 @method_decorator(
@@ -473,7 +446,10 @@ class CampaignDetailView(RecentlyViewedMixin, LoginRequiredMixin, HorillaDetailV
         show_actions = (
             self.request.user.is_superuser
             or self.request.user.has_perm("campaigns.change_campaign")
-            or self.get_queryset().filter(campaign_owner=self.request.user).exists()
+            or (
+                self.get_queryset().filter(campaign_owner=self.request.user).exists()
+                and self.request.user.has_perm("campaigns.change_own_campaign")
+            )
         )
 
         if show_actions:
@@ -669,6 +645,50 @@ class CampaignRelatedListsTab(LoginRequiredMixin, HorillaRelatedListSectionView)
         pk = self.request.GET.get("object_id")
         referrer_url = "campaign_detail_view"
 
+        member_actions = []
+
+        can_edit_members = (
+            user.is_superuser
+            or user.has_perm("campaigns.change_campaignmember")
+            or (
+                user.has_perm("campaigns.change_own_campaignmember")
+                and CampaignMember.user_has_owned_members(user)
+            )
+        )
+
+        if can_edit_members:
+            member_actions.append(
+                {
+                    "action": "edit",
+                    "src": "/assets/icons/edit.svg",
+                    "img_class": "w-4 h-4",
+                    "attrs": """
+                    hx-get="{get_edit_campaign_member}"
+                    hx-target="#modalBox"
+                    hx-swap="innerHTML"
+                    onclick="event.stopPropagation();openModal()"
+                    hx-indicator="#modalBox"
+                """,
+                }
+            )
+
+        if user.has_perm("campaigns.delete_campaignmember"):
+            member_actions.append(
+                {
+                    "action": "Delete",
+                    "src": "assets/icons/a4.svg",
+                    "img_class": "w-4 h-4",
+                    "attrs": """
+                    hx-post="{get_delete_url}"
+                    hx-target="#modalBox"
+                    hx-swap="innerHTML"
+                    hx-trigger="click"
+                    hx-vals='{{"check_dependencies": "false"}}'
+                    onclick="openModal()"
+                """,
+                }
+            )
+
         members_config = {
             "title": "Campaign Members",
             "can_add": True,
@@ -684,40 +704,17 @@ class CampaignRelatedListsTab(LoginRequiredMixin, HorillaRelatedListSectionView)
                     "get_member_status_display",
                 ),
             ],
-            "actions": [
-                {
-                    "action": "edit",
-                    "src": "/assets/icons/edit.svg",
-                    "img_class": "w-4 h-4",
-                    "attrs": """
-                        hx-get="{get_edit_campaign_member}"
-                        hx-target="#modalBox"
-                        hx-swap="innerHTML"
-                        onclick="event.stopPropagation();openModal()"
-                        hx-indicator="#modalBox"
-                    """,
-                },
-                (
-                    {
-                        "action": "Delete",
-                        "src": "assets/icons/a4.svg",
-                        "img_class": "w-4 h-4",
-                        "attrs": """
-                        hx-post="{get_delete_url}"
-                        hx-target="#modalBox"
-                        hx-swap="innerHTML"
-                        hx-trigger="click"
-                        hx-vals='{{"check_dependencies": "false"}}'
-                        onclick="openModal()"
-                    """,
-                    }
-                    if self.request.user.has_perm("campaigns.delete_campaignmember")
-                    else {}
-                ),
-            ],
         }
 
-        if user.has_perm("leads.view_lead") or user.has_perm("contacts.view_contact"):
+        if member_actions:
+            members_config["actions"] = member_actions
+
+        if (
+            user.has_perm("leads.view_lead")
+            or user.has_perm("contacts.view_contact")
+            or user.has_perm("leads.view_own_lead")
+            or user.has_perm("contacts.view_own_contact")
+        ):
             members_config["col_attrs"] = [
                 {
                     "get_title": {
@@ -780,7 +777,9 @@ class CampaignRelatedListsTab(LoginRequiredMixin, HorillaRelatedListSectionView)
             ],
         }
 
-        if user.has_perm("campaigns.view_campaign"):
+        if user.has_perm("campaigns.view_campaign") or user.has_perm(
+            "campaigns.view_own_campaign"
+        ):
             child_campaigns_config["col_attrs"] = [
                 {
                     "campaign_name": {
@@ -1123,21 +1122,6 @@ class AddCampaignMemberFormview(LoginRequiredMixin, HorillaSingleFormView):
     form_title = _("Add Campaign Members")
     full_width_fields = ["member_status", "member_type", "lead", "contact"]
 
-    def get(self, request, *args, **kwargs):
-
-        campaign_id = request.GET.get("id")
-        if request.user.has_perm("campaigns.change_campaign") or request.user.has_perm(
-            "campaigns.add_campaign"
-        ):
-            return super().get(request, *args, **kwargs)
-
-        if campaign_id:
-            campaign = get_object_or_404(Campaign, pk=campaign_id)
-            if campaign.campaign_owner == request.user:
-                return super().get(request, *args, **kwargs)
-
-        return render(request, "error/403.html")
-
     def get_initial(self):
         initial = super().get_initial()
         campaign_id = (
@@ -1213,24 +1197,6 @@ class AddContactToCampaignFormView(LoginRequiredMixin, HorillaSingleFormView):
         if contact_id:
             initial["contact"] = contact_id
         return initial
-
-    def get(self, request, *args, **kwargs):
-
-        contact_id = request.GET.get("id")
-        if request.user.has_perm("contacts.change_contact") or request.user.has_perm(
-            "contacts.add_contact"
-        ):
-            return super().get(request, *args, **kwargs)
-
-        if contact_id:
-            contact = apps.get_model("contacts", "Contact")
-
-            contact = get_object_or_404(contact, pk=contact_id)
-
-            if contact.contact_owner == request.user:
-                return super().get(request, *args, **kwargs)
-
-        return render(request, "error/403.html")
 
     @cached_property
     def form_url(self):

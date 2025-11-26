@@ -897,6 +897,11 @@ class HorillaUser(AbstractUser):
     all_objects = UserManager()
     objects = UserManager()
 
+    default_field_permissions = {
+        "role": "readonly",
+        "department": "readonly",
+    }
+
     class Meta:
         """
         Meta options for the HorillaUser model.
@@ -1031,6 +1036,17 @@ class HorillaAboutSystem(models.Model):
         default_permissions = ()
         permissions = (("can_view_horilla_about_system", "Can View About System"),)
         verbose_name = _("About System")
+
+
+class HorillaUserProfile(models.Model):
+    class Meta:
+        managed = False
+        default_permissions = ()
+        permissions = (
+            ("can_view_profile", "Can View Profile"),
+            ("can_change_profile", "Can Change Profile"),
+        )
+        verbose_name = _("User Profile")
 
 
 @permission_exempt_model

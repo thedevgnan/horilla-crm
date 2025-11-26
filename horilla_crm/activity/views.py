@@ -159,8 +159,11 @@ class AllActivityListView(LoginRequiredMixin, HorillaListView):
         show_actions = (
             self.request.user.is_superuser
             or self.request.user.has_perm("activity.change_activity")
-            or self.get_queryset().filter(owner=self.request.user).exists()
             or self.get_queryset().filter(assigned_to=self.request.user).exists()
+            or (
+                self.get_queryset().filter(owner=self.request.user).exists()
+                and self.request.user.has_perm("activity.change_own_activity")
+            )
         )
 
         if show_actions:
@@ -522,7 +525,8 @@ class TaskListView(LoginRequiredMixin, HorillaListView):
     paginate_by = 5
     table_class = False
     table_width = False
-    table_height_as_class = "h-[260px]"
+    table_height = False
+    table_height_as_class = "h-[calc(_100vh_-_500px_)]"
     list_column_visibility = False
 
     columns = [
@@ -573,7 +577,10 @@ class TaskListView(LoginRequiredMixin, HorillaListView):
         show_actions = (
             self.request.user.is_superuser
             or self.request.user.has_perm("activity.change_activity")
-            or self.get_queryset().filter(owner=self.request.user).exists()
+            or (
+                self.get_queryset().filter(owner=self.request.user).exists()
+                and self.request.user.has_perm("activity.change_own_activity")
+            )
         )
 
         if show_actions:
@@ -700,7 +707,8 @@ class MeetingListView(HorillaListView):
     bulk_select_option = False
     table_class = False
     table_width = False
-    table_height_as_class = "h-[260px]"
+    table_height = False
+    table_height_as_class = "h-[calc(_100vh_-_500px_)]"
     list_column_visibility = False
 
     columns = [
@@ -751,7 +759,10 @@ class MeetingListView(HorillaListView):
         show_actions = (
             self.request.user.is_superuser
             or self.request.user.has_perm("activity.change_activity")
-            or self.get_queryset().filter(owner=self.request.user).exists()
+            or (
+                self.get_queryset().filter(owner=self.request.user).exists()
+                and self.request.user.has_perm("activity.change_own_activity")
+            )
         )
 
         if show_actions:
@@ -843,7 +854,8 @@ class CallListView(HorillaListView):
     clear_session_button_enabled = False
     bulk_select_option = False
     table_class = False
-    table_height_as_class = "h-[260px]"
+    table_height = False
+    table_height_as_class = "h-[calc(_100vh_-_500px_)]"
     table_width = False
     list_column_visibility = False
 
@@ -895,7 +907,10 @@ class CallListView(HorillaListView):
         show_actions = (
             self.request.user.is_superuser
             or self.request.user.has_perm("activity.change_activity")
-            or self.get_queryset().filter(owner=self.request.user).exists()
+            or (
+                self.get_queryset().filter(owner=self.request.user).exists()
+                and self.request.user.has_perm("activity.change_own_activity")
+            )
         )
 
         if show_actions:
@@ -988,7 +1003,8 @@ class EmailListView(HorillaListView):
     paginate_by = 10
     table_class = False
     table_width = False
-    table_height_as_class = "h-[260px]"
+    table_height = False
+    table_height_as_class = "h-[calc(_100vh_-_500px_)]"
     list_column_visibility = False
 
     columns = [
@@ -1136,13 +1152,13 @@ class EmailListView(HorillaListView):
 
         if view_type == "sent":
             queryset = queryset.filter(mail_status="sent")
-            self.view_id = "ActivityEmailListSent"
+            self.view_id = "activity-email-list-sent"
         elif view_type == "draft":
             queryset = queryset.filter(mail_status="draft")
-            self.view_id = "ActivityEmailListDraft"
+            self.view_id = "activity-email-list-draft"
         elif view_type == "scheduled":
             queryset = queryset.filter(mail_status="scheduled")
-            self.view_id = "ActivityEmailListScheduled"
+            self.view_id = "activity-email-list-scheduled"
 
         return queryset
 
@@ -1171,7 +1187,8 @@ class EventListView(HorillaListView):
     paginate_by = 10
     table_class = False
     table_width = False
-    table_height_as_class = "h-[260px]"
+    table_height = False
+    table_height_as_class = "h-[calc(_100vh_-_500px_)]"
     list_column_visibility = False
 
     columns = [
@@ -1209,7 +1226,10 @@ class EventListView(HorillaListView):
         show_actions = (
             self.request.user.is_superuser
             or self.request.user.has_perm("activity.change_activity")
-            or self.get_queryset().filter(owner=self.request.user).exists()
+            or (
+                self.get_queryset().filter(owner=self.request.user).exists()
+                and self.request.user.has_perm("activity.change_own_activity")
+            )
         )
 
         if show_actions:

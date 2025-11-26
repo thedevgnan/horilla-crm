@@ -67,6 +67,21 @@ class CampaignMember(HorillaCoreModel):
         default="lead",
     )
 
+    def is_owned_by(self, user):
+        """Check if this campaign member is owned by the user"""
+        if self.lead and hasattr(self.lead, "lead_owner"):
+            return self.lead.lead_owner == user
+        if self.contact and hasattr(self.contact, "contact_owner"):
+            return self.contact.contact_owner == user
+        return False
+
+    @classmethod
+    def user_has_owned_members(cls, user):
+        """Check if user owns any campaign members"""
+        return cls.objects.filter(
+            models.Q(lead__lead_owner=user) | models.Q(contact__contact_owner=user)
+        ).exists()
+
     def get_detail_view(self):
         """
         Returns the detail view URL for the associated Lead or Contact based on member_type.

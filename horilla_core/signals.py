@@ -28,6 +28,7 @@ from django.dispatch import Signal, receiver
 
 from horilla_core.models import (
     Company,
+    FieldPermission,
     FiscalYear,
     HorillaUser,
     MultipleCurrency,
@@ -128,12 +129,22 @@ def add_custom_permissions(sender, **kwargs):
             or opts.default_permissions == ("add", "change", "delete", "view")
         )
 
+        add_change_own = (
+            "change_own" in opts.default_permissions
+            or opts.default_permissions == ("add", "change", "delete", "view")
+        )
+
         custom_perms = []
         if add_import:
             custom_perms.append(("can_import", f"Can import {opts.verbose_name_raw}"))
 
         if add_view_own:
             custom_perms.append(("view_own", f"Can view own {opts.verbose_name_raw}"))
+
+        if add_change_own:
+            custom_perms.append(
+                ("change_own", f"Can change own {opts.verbose_name_raw}")
+            )
 
         for code_prefix, name in custom_perms:
             codename = f"{code_prefix}_{opts.model_name}"
@@ -429,5 +440,78 @@ def ensure_role_view_own_permissions(sender, instance, created, **kwargs):
 
         except Exception as e:
             print(f"✗ Error assigning permissions to role '{instance.role_name}': {e}")
+
+    transaction.on_commit(assign_permissions)
+
+
+@receiver(post_save, sender=HorillaUser)
+def user_default_field_permissions(sender, instance, created, **kwargs):
+    """
+    Assign default field permissions to newly created users.
+    """
+    if not created or instance.is_superuser:
+        return
+
+    def assign_permissions():
+        try:
+            for model in apps.get_models():
+                defaults = getattr(model, "default_field_permissions", {})
+                if not defaults:
+                    continue
+
+                content_type = ContentType.objects.get_for_model(model)
+                for field_name, perm in defaults.items():
+                    FieldPermission.objects.get_or_create(
+                        user=instance,
+                        content_type=content_type,
+                        field_name=field_name,
+                        defaults={"permission_type": perm},
+                    )
+        except Exception as e:
+            print(
+                f"✗ Error assigning default field permissions to {instance.username}: {e}"
+            )
+
+    transaction.on_commit(assign_permissions)
+
+
+@receiver(post_save, sender=Role)
+def role_default_field_permissions(sender, instance, created, **kwargs):
+    """
+    Assign default field permissions to newly created roles.
+    Also assign these permissions to all members of the role.
+    """
+
+    def assign_permissions():
+        try:
+            for model in apps.get_models():
+                defaults = getattr(model, "default_field_permissions", {})
+                if not defaults:
+                    continue
+
+                content_type = ContentType.objects.get_for_model(model)
+
+                for field_name, perm in defaults.items():
+                    # Assign to role
+                    FieldPermission.objects.get_or_create(
+                        role=instance,
+                        content_type=content_type,
+                        field_name=field_name,
+                        defaults={"permission_type": perm},
+                    )
+
+                    # Assign to all users in this role
+                    for user in instance.users.all():
+                        FieldPermission.objects.get_or_create(
+                            user=user,
+                            content_type=content_type,
+                            field_name=field_name,
+                            defaults={"permission_type": perm},
+                        )
+
+        except Exception as e:
+            print(
+                f"✗ Error assigning default field permissions to role '{instance.role_name}': {e}"
+            )
 
     transaction.on_commit(assign_permissions)

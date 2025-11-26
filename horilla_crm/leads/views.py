@@ -200,8 +200,12 @@ class LeadListView(LoginRequiredMixin, HorillaListView):
         show_actions = (
             self.request.user.is_superuser
             or self.request.user.has_perm("leads.change_lead")
-            or self.get_queryset().filter(lead_owner=self.request.user).exists()
+            or (
+                self.get_queryset().filter(lead_owner=self.request.user).exists()
+                and self.request.user.has_perm("leads.change_own_lead")
+            )
         )
+
         query_params = {}
         if "section" in self.request.GET:
             query_params["section"] = self.request.GET.get("section")
@@ -317,7 +321,10 @@ class LeadKanbanView(LoginRequiredMixin, HorillaKanbanView):
         show_actions = (
             self.request.user.is_superuser
             or self.request.user.has_perm("leads.change_lead")
-            or self.get_queryset().filter(lead_owner=self.request.user).exists()
+            or (
+                self.get_queryset().filter(lead_owner=self.request.user).exists()
+                and self.request.user.has_perm("leads.change_own_lead")
+            )
         )
 
         if show_actions:
@@ -483,20 +490,6 @@ class LeadFormView(LoginRequiredMixin, HorillaMultiStepFormView):
         kwargs["request"] = self.request
         return kwargs
 
-    def get(self, request, *args, **kwargs):
-        lead_id = self.kwargs.get("pk")
-        if request.user.has_perm("leads.change_lead") or request.user.has_perm(
-            "leads.add_lead"
-        ):
-            return super().get(request, *args, **kwargs)
-
-        if lead_id:
-            lead = get_object_or_404(Lead, pk=lead_id)
-            if lead.lead_owner == request.user:
-                return super().get(request, *args, **kwargs)
-
-        return render(request, "error/403.html")
-
 
 @method_decorator(
     permission_required_or_denied(["leads.view_lead", "leads.view_own_lead"]),
@@ -547,7 +540,10 @@ class LeadDetailView(RecentlyViewedMixin, LoginRequiredMixin, HorillaDetailView)
         show_actions = (
             self.request.user.is_superuser
             or self.request.user.has_perm("leads.change_lead")
-            or self.get_queryset().filter(lead_owner=self.request.user).exists()
+            or (
+                self.get_queryset().filter(lead_owner=self.request.user).exists()
+                and self.request.user.has_perm("leads.change_own_lead")
+            )
         )
 
         if show_actions:
@@ -748,7 +744,9 @@ class LeadRelatedLists(LoginRequiredMixin, HorillaRelatedListSectionView):
         pk = self.request.GET.get("object_id")
         referrer_url = "leads_detail"
         col_attrs = []
-        if self.request.user.has_perm("campaigns.view_campaign"):
+        if self.request.user.has_perm(
+            "campaigns.view_campaign"
+        ) or self.request.user.has_perm("campaigns.view_own_campaign"):
             col_attrs = [
                 {
                     "campaign_name": {
@@ -894,26 +892,6 @@ class LeadChangeOwnerForm(LoginRequiredMixin, HorillaSingleFormView):
         pk = self.kwargs.get("pk") or self.request.GET.get("id")
         if pk:
             return reverse_lazy("leads:lead_change_owner", kwargs={"pk": pk})
-
-    def get(self, request, *args, **kwargs):
-        lead_id = self.kwargs.get("pk")
-        if request.user.has_perm("leads.change_lead") or request.user.has_perm(
-            "leads.add_lead"
-        ):
-            return super().get(request, *args, **kwargs)
-
-        if lead_id:
-            try:
-                lead = get_object_or_404(Lead, pk=lead_id)
-            except Http404:
-                messages.error(self.request, "Lead not found.")
-                return HttpResponse(
-                    "<script>$('#reloadButton').click();closeModal();</script>"
-                )
-            if lead.lead_owner == request.user:
-                return super().get(request, *args, **kwargs)
-
-        return render(request, "error/403.html")
 
 
 @method_decorator(htmx_required, name="dispatch")

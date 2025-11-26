@@ -1,6 +1,7 @@
 {% load static %}
 {% load i18n %}
 {% load horilla_tags %}
+{% has_perm "activity.add_activity" as can_add_activity %}
 <div id="styled-activity" role="tabpanel" aria-labelledby="activity-tab" style="height:100%">
     <div class="flex flex-col sm:flex-row gap-3" style="height:100%">
         <div class="sm:w-[180px] w-full border-r-[1px] border-[#dddddd]">
@@ -59,16 +60,18 @@
                                 </a>
                             </li>
                         </ul>
-                        {% if add_task_button.url %}
-                            <button
-                                hx-get="{{ add_task_button.url }}?object_id={{ obj.pk }}&model_name={{obj|model_name}}&app_label={{app_label}}"
-                                hx-target="{{ add_task_button.target|default:'#modalBox' }}"
-                                hx-swap="{{ add_task_button.swap|default:'innerHTML' }}"
-                                onclick="{{ add_task_button.after_request|default:'openModal()' }}"
-                                class="{{ add_task_button.class|default:'text-xs px-4 py-1.5 bg-primary-600 rounded-md hover:bg-primary-800 transition duration-300 text-[white]' }}"
-                                {% if add_task_button.attrs %}{{ add_task_button.attrs|safe }}{% endif %}>
-                                {{ add_task_button.title|default:" Add Task" }}
-                            </button>
+                        {% if can_add_activity %}
+                            {% if add_task_button.url %}
+                                <button
+                                    hx-get="{{ add_task_button.url }}?object_id={{ obj.pk }}&model_name={{obj|model_name}}&app_label={{app_label}}"
+                                    hx-target="{{ add_task_button.target|default:'#modalBox' }}"
+                                    hx-swap="{{ add_task_button.swap|default:'innerHTML' }}"
+                                    onclick="{{ add_task_button.after_request|default:'openModal()' }}"
+                                    class="{{ add_task_button.class|default:'text-xs px-4 py-1.5 bg-primary-600 rounded-md hover:bg-primary-800 transition duration-300 text-[white]' }}"
+                                    {% if add_task_button.attrs %}{{ add_task_button.attrs|safe }}{% endif %}>
+                                    {{ add_task_button.title|default:" Add Task" }}
+                                </button>
+                            {% endif %}
                         {% endif %}
                     </div>
                     <div id="task-list-content" class="text-[.8rem]"
@@ -103,16 +106,18 @@
                                 </a>
                             </li>
                         </ul>
-                        {% if add_meetings_button.url %}
-                            <button
-                                hx-get="{{ add_meetings_button.url }}?object_id={{ obj.pk }}&model_name={{obj|model_name}}&app_label={{app_label}}"
-                                hx-target="{{ add_meetings_button.target|default:'#modalBox' }}"
-                                hx-swap="{{ add_meetings_button.swap|default:'innerHTML' }}"
-                                onclick="{{ add_meetings_button.after_request|default:'openModal()' }}"
-                                class="{{ add_meetings_button.class|default:'text-xs px-4 py-1.5 bg-primary-600 rounded-md hover:bg-primary-800 transition duration-300 text-[white]' }}"
-                                {% if add_meetings_button.attrs %}{{ add_meetings_button.attrs|safe }}{% endif %}>
-                                {{ add_meetings_button.title|default:" Add Meetings" }}
-                            </button>
+                        {% if can_add_activity %}
+                            {% if add_meetings_button.url %}
+                                <button
+                                    hx-get="{{ add_meetings_button.url }}?object_id={{ obj.pk }}&model_name={{obj|model_name}}&app_label={{app_label}}"
+                                    hx-target="{{ add_meetings_button.target|default:'#modalBox' }}"
+                                    hx-swap="{{ add_meetings_button.swap|default:'innerHTML' }}"
+                                    onclick="{{ add_meetings_button.after_request|default:'openModal()' }}"
+                                    class="{{ add_meetings_button.class|default:'text-xs px-4 py-1.5 bg-primary-600 rounded-md hover:bg-primary-800 transition duration-300 text-[white]' }}"
+                                    {% if add_meetings_button.attrs %}{{ add_meetings_button.attrs|safe }}{% endif %}>
+                                    {{ add_meetings_button.title|default:" Add Meetings" }}
+                                </button>
+                            {% endif %}
                         {% endif %}
                     </div>
                     <div id="meeting-list-content" class="text-[.8rem]"
@@ -148,16 +153,18 @@
                                 </a>
                             </li>
                         </ul>
-                        {% if add_call_button.url %}
-                            <button
-                                hx-get="{{ add_call_button.url }}?object_id={{ obj.pk }}&model_name={{obj|model_name}}&app_label={{app_label}}"
-                                hx-target="{{ add_call_button.target|default:'#modalBox' }}"
-                                hx-swap="{{ add_call_button.swap|default:'innerHTML' }}"
-                                onclick="{{ add_call_button.after_request|default:'openModal()' }}"
-                                class="{{ add_call_button.class|default:'text-xs px-4 py-1.5 bg-primary-600 rounded-md hover:bg-primary-800 transition duration-300 text-[white]' }}"
-                                {% if add_call_button.attrs %}{{ add_call_button.attrs|safe }}{% endif %}>
-                                {{ add_call_button.title|default:" Add Call" }}
-                            </button>
+                        {% if can_add_activity %}
+                            {% if add_call_button.url %}
+                                <button
+                                    hx-get="{{ add_call_button.url }}?object_id={{ obj.pk }}&model_name={{obj|model_name}}&app_label={{app_label}}"
+                                    hx-target="{{ add_call_button.target|default:'#modalBox' }}"
+                                    hx-swap="{{ add_call_button.swap|default:'innerHTML' }}"
+                                    onclick="{{ add_call_button.after_request|default:'openModal()' }}"
+                                    class="{{ add_call_button.class|default:'text-xs px-4 py-1.5 bg-primary-600 rounded-md hover:bg-primary-800 transition duration-300 text-[white]' }}"
+                                    {% if add_call_button.attrs %}{{ add_call_button.attrs|safe }}{% endif %}>
+                                    {{ add_call_button.title|default:" Add Call" }}
+                                </button>
+                            {% endif %}
                         {% endif %}
                     </div>
                     <div id="call-list-content" class="text-[.8rem]"
@@ -200,17 +207,19 @@
                                 </button>
                             </li>
                         </ul>
-                        {% if add_email_button.url %}
-                            <button
-                                hx-get="{{ add_email_button.url }}?object_id={{ obj.pk }}&model_name={{obj|model_name}}"
-                                hx-target="{{ add_email_button.target|default:'#horillaModalBox' }}"
-                                hx-swap="{{ add_email_button.swap|default:'innerHTML' }}"
-                                onclick="{{ add_email_button.after_request|default:'openhorillaModal()' }}"
-                                class="{{ add_email_button.class|default:'text-xs px-4 py-1.5 bg-primary-600 rounded-md hover:bg-primary-800 transition duration-300 text-[white]' }}"
-                                {% if add_email_button.attrs %}{{ add_email_button.attrs|safe }}{% endif %}>
-                                {{ add_email_button.title|default:" Add Emails" }}
-                            </button>
-                        {% endif %}
+                        {% if can_add_activity %}
+                            {% if add_email_button.url %}
+                                <button
+                                    hx-get="{{ add_email_button.url }}?object_id={{ obj.pk }}&model_name={{obj|model_name}}"
+                                    hx-target="{{ add_email_button.target|default:'#horillaModalBox' }}"
+                                    hx-swap="{{ add_email_button.swap|default:'innerHTML' }}"
+                                    onclick="{{ add_email_button.after_request|default:'openhorillaModal()' }}"
+                                    class="{{ add_email_button.class|default:'text-xs px-4 py-1.5 bg-primary-600 rounded-md hover:bg-primary-800 transition duration-300 text-[white]' }}"
+                                    {% if add_email_button.attrs %}{{ add_email_button.attrs|safe }}{% endif %}>
+                                    {{ add_email_button.title|default:" Add Emails" }}
+                                </button>
+                            {% endif %}
+                        {% endif%}
                     </div>
                     <div id="email-list-content" class="text-[.8rem]"
                          hx-get="{% url 'activity:email_list' object_id=object_id %}?view_type=sent&content_type_id={{ content_type_id }}"
@@ -243,16 +252,18 @@
                                 </a>
                             </li>
                         </ul>
-                        {% if add_event_button.url %}
-                            <button
-                                hx-get="{{ add_event_button.url }}?object_id={{ obj.pk }}&model_name={{obj|model_name}}&app_label={{app_label}}"
-                                hx-target="{{ add_event_button.target|default:'#modalBox' }}"
-                                hx-swap="{{ add_event_button.swap|default:'innerHTML' }}"
-                                onclick="{{ add_event_button.after_request|default:'openModal()' }}"
-                                class="{{ add_event_button.class|default:'text-xs px-4 py-1.5 bg-primary-600 rounded-md hover:bg-primary-800 transition duration-300 text-[white]' }}"
-                                {% if add_event_button.attrs %}{{ add_event_button.attrs|safe }}{% endif %}>
-                                {{ add_event_button.title|default:" Add Events" }}
-                            </button>
+                        {% if can_add_activity %}
+                            {% if add_event_button.url %}
+                                <button
+                                    hx-get="{{ add_event_button.url }}?object_id={{ obj.pk }}&model_name={{obj|model_name}}&app_label={{app_label}}"
+                                    hx-target="{{ add_event_button.target|default:'#modalBox' }}"
+                                    hx-swap="{{ add_event_button.swap|default:'innerHTML' }}"
+                                    onclick="{{ add_event_button.after_request|default:'openModal()' }}"
+                                    class="{{ add_event_button.class|default:'text-xs px-4 py-1.5 bg-primary-600 rounded-md hover:bg-primary-800 transition duration-300 text-[white]' }}"
+                                    {% if add_event_button.attrs %}{{ add_event_button.attrs|safe }}{% endif %}>
+                                    {{ add_event_button.title|default:" Add Events" }}
+                                </button>
+                            {% endif %}
                         {% endif %}
                     </div>
                     <div id="event-list-content" class="text-[.8rem]"

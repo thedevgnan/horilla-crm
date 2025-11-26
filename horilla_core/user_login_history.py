@@ -58,17 +58,8 @@ class UserloginHistoryListView(LoginRequiredMixin, HorillaListView):
     bulk_update_option = False
     enable_sorting = False
     table_width = False
+    table_height = False
     table_height_as_class = "h-[500px]"
-
-    header_attrs = [
-        {
-            "short_user_agent": {"style": "width: 250px;"},
-            "is_login_icon": {"style": "width: 80px;"},
-            "ip": {"style": "width: 100px;"},
-            "user_status": {"style": "width: 100px;"},
-            "formatted_datetime": {"style": "width: 125px;"},
-        },
-    ]
 
     def get_queryset(self):
         user = self.request.user
@@ -87,7 +78,7 @@ class UserloginHistoryListView(LoginRequiredMixin, HorillaListView):
         return queryset
 
     columns = [
-        (_("Browser"), "user_agent"),
+        (_("Browser"), "short_user_agent"),
         (_("Login Time"), "formatted_datetime"),
         (_("Is Active"), "is_login_icon"),
         (_("IP"), "ip"),

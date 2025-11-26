@@ -382,6 +382,10 @@ def get_user_field_permission(user, model, field_name):
         if role_perm:
             return role_perm.permission_type
 
+    model_defaults = getattr(model, "default_field_permissions", {})
+    if field_name in model_defaults:
+        return model_defaults[field_name]
+
     return "readwrite"
 
 
@@ -411,6 +415,11 @@ def get_field_permissions_for_model(user, model):
         for perm in role_perms:
             if perm.field_name not in permissions_dict:
                 permissions_dict[perm.field_name] = perm.permission_type
+
+    model_defaults = getattr(model, "default_field_permissions", {})
+    for field_name, default_value in model_defaults.items():
+        if field_name not in permissions_dict:
+            permissions_dict[field_name] = default_value
 
     return permissions_dict
 

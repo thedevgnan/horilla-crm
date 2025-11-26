@@ -16,7 +16,28 @@
                     />
                 </label>
             </div>
-            <div class="w-44">{{ model.verbose_name }}</div>
+            <div class="w-44">
+                {% if model.is_managed %}
+                    <button
+                        class="whitespace-nowrap text-left hover:text-primary-600"
+                        hx-get="{% url 'horilla_core:model_fields_modal_role' role.id model.app_label model.model_name %}"
+                        hx-target="#modalBox"
+                        hx-swap="innerHTML"
+                        onclick="openModal()"
+                    >
+                        {{ model.verbose_name }}
+                    </button>
+                {% else %}
+                    <div class="relative group inline-block cursor-pointer">
+                        <span class="whitespace-nowrap text-black ">
+                            {{ model.verbose_name }}
+                        </span>
+                        <span class="min-w-max z-40 absolute h-auto py-[3px] px-[15px] left-[40px] top-0 bg-[#000000] text-[.7rem] rounded-[5px] text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                            {% trans 'Field permissions not available for this model' %}
+                        </span>
+                    </div>
+                {% endif %}
+            </div>
 
             <div class="flex gap-12 text-xs text-dark-300">
                 {% for perm in model.permissions %}

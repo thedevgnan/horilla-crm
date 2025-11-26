@@ -7,7 +7,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.paginator import Paginator
-from django.db import models
+from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -26,7 +26,15 @@ from horilla_generics.views import HorillaListView, HorillaTabView
 class PermissionUtils:
     """Utility class to handle common permission-related logic."""
 
-    FIXED_ORDER = ["add", "change", "view", "delete", "view_own", "can_import"]
+    FIXED_ORDER = [
+        "add",
+        "change",
+        "view",
+        "delete",
+        "view_own",
+        "change_own",
+        "can_import",
+    ]
 
     PERMISSION_MAP = {
         "add": "Create",
@@ -34,6 +42,7 @@ class PermissionUtils:
         "view": "View",
         "delete": "Delete",
         "view_own": "View Own",
+        "change_own": "Change Own",
         "can_import": "Import",
     }
 
@@ -237,6 +246,11 @@ class ModelFieldsModalView(LoginRequiredMixin, TemplateView):
                         existing_permissions[perm.field_name] = perm.permission_type
 
         allowed_fields = getattr(model, "field_permissions", None)
+        if not isinstance(allowed_fields, (list, tuple, set)):
+            allowed_fields = None
+
+        model_defaults = getattr(model, "default_field_permissions", {})
+
         fields = []
 
         for field in model._meta.get_fields():
@@ -249,7 +263,15 @@ class ModelFieldsModalView(LoginRequiredMixin, TemplateView):
                 continue
 
             verbose_name = getattr(field, "verbose_name", field_name).title()
-            current_permission = existing_permissions.get(field_name, "readwrite")
+
+            if field_name in existing_permissions:
+                current_permission = existing_permissions[field_name]
+            elif field_name in model_defaults:
+                current_permission = model_defaults[field_name]
+            else:
+                current_permission = "readwrite"
+
+            # current_permission = existing_permissions.get(field_name, "readwrite")
 
             fields.append(
                 {
@@ -840,6 +862,7 @@ class RoleMembersView(LoginRequiredMixin, TemplateView):
             ),
             columns=columns,
             table_width=True,
+            table_height=False,
             table_height_as_class="h-[400px]",
             bulk_select_option=False,
             bulk_export_option=False,
@@ -1009,11 +1032,17 @@ class LoadMoreUsersView(LoginRequiredMixin, TemplateView):
         users = HorillaUser.objects.filter(is_superuser=False)
 
         if search_query:
-            users = users.filter(
-                models.Q(username__icontains=search_query)
-                | models.Q(first_name__icontains=search_query)
-                | models.Q(last_name__icontains=search_query)
-            )
+            search_words = search_query.split()
+
+            q_object = Q()
+            for word in search_words:
+                q_object &= (
+                    Q(username__icontains=word)
+                    | Q(first_name__icontains=word)
+                    | Q(last_name__icontains=word)
+                )
+
+            users = users.filter(q_object)
 
         paginator = Paginator(users, 10)
         page_number = request.GET.get("page")
