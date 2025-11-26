@@ -11,6 +11,14 @@
 [![Django](https://img.shields.io/badge/django-5.2+-green.svg)](https://djangoproject.com)
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg)](https://docker.com)
 
+## 📚 Resources
+<div align="center">
+  <a href="https://github.com/horilla-opensource/horilla-crm">GitHub</a> •
+  <a href="https://docs.horilla.com/crm/functional/v1.0/">Documentation</a> •
+  <a href="https://crm.demo.horilla.com/">Live Demo</a> •
+  <a href="https://www.horilla.com/contact-us/">Support</a>
+</div>
+
 ## ✨ Features
 
 ### 🏢 **Core CRM Modules**
@@ -358,20 +366,6 @@ docker-compose logs -f nginx
 - Provide environment information
 - Add relevant logs and screenshots
 
-## 📚 Documentation
-
-### User Documentation
-- **Admin Guide**: Complete administration documentation
-- **User Manual**: End-user feature documentation
-- **API Reference**: Complete API documentation
-- **Integration Guide**: Third-party integration examples
-
-### Developer Documentation
-- **Architecture Guide**: System design and components
-- **Contributing Guide**: Development setup and guidelines
-- **API Documentation**: REST API reference
-- **Deployment Guide**: Production deployment instructions
-
 ## 🆘 Support
 
 ### Community Support
@@ -403,7 +397,7 @@ docker-compose logs -f nginx
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the LGPL2.1 License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
@@ -416,8 +410,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <div align="center">
   <p>Made with ❤️ by the Horilla team</p>
   <p>
+    <a href="https://crm.demo.horilla.com/">Demo</a> •
     <a href="https://github.com/horilla-opensource/horilla-crm">GitHub</a> •
-    <a href="#documentation">Documentation</a> •
-    <a href="#support">Support</a>
+    <a href="https://docs.horilla.com/crm/functional/v1.0/">Documentation</a> •
+    <a href="https://www.horilla.com/contact-us/">Support</a>
   </p>
 </div>
