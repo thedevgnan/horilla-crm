@@ -21,6 +21,30 @@
                     <img src="{% static 'assets/icons/close.svg' %}" alt="Close" />
                 </button>
             </div>
+            {% if multi_step_url %}
+                <div class="pt-0 mb-2">
+                    <ul class="flex gap-2 text-sm font-normal text-gray-500">
+                        <li>
+                            <a href="{{ multi_step_url }}"
+                            class="inline-flex items-center px-3 py-1 rounded-sm w-full text-xs bg-primary-200 text-primary-600"
+                            hx-get="{{ multi_step_url }}"
+                            hx-target="#modalBox"
+                            hx-swap="innerHTML">
+                            {% trans "Multi-Step Form" %}
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ form_url }}"
+                            class="inline-flex items-center px-3 py-1 rounded-sm w-full text-xs text-white bg-primary-600"
+                            hx-get="{{ form_url }}"
+                            hx-target="#modalBox"
+                            hx-swap="innerHTML">
+                            {% trans "Single-Step Form" %}
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                {% endif %}
             {% endif %}
             {% if form.non_field_errors %}
                 <div class="bg-red-50 text-red-500 px-4 py-3 rounded-lg text-sm mb-4">
@@ -173,7 +197,7 @@
                                           </div>
                                         {% if field.name in dynamic_create_fields and field.name in related_models_info %}
                                             <button type="button"
-                                                    class="text-primary-600 hover:text-primary-800 text-xs font-semibold px-2 py-1 bg-primary-300 rounded border border-primary-200 transition-colors"
+                                                    class="whitespace-nowrap text-primary-600 hover:text-primary-800 text-xs font-semibold px-2 py-1 bg-primary-300 rounded border border-primary-200 transition-colors"
                                                     hx-get="{% url 'horilla_generics:dynamic_create' related_models_info|get_item_form:field.name|get_item_form:'app_label' related_models_info|get_item_form:field.name|get_item_form:'model_name' %}?target_field={{ field.name }}&fields={{ dynamic_create_field_mapping|get_item_form:field.name|get_item_form:'fields'|join:',' }}&full_width_fields={{ dynamic_create_field_mapping|get_item_form:field.name|get_item_form:'full_width_fields'|join:',' }}"
                                                     hx-target="#dynamicCreateModalBox"
                                                     hx-on:click="openDynamicModal();"

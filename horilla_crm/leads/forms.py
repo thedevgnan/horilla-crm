@@ -1,5 +1,6 @@
 """Forms for Lead model and Lead conversion process."""
 
+import pycountry
 from django import forms
 from django.urls import reverse, reverse_lazy
 
@@ -36,7 +37,7 @@ class LeadFormClass(OwnerQuerysetMixin, HorillaMultiStepForm):
             "lead_status",
         ],
         2: ["lead_company", "no_of_employees", "industry", "annual_revenue"],
-        3: ["city", "state", "country", "zip_code"],
+        3: ["country", "state", "city", "zip_code"],
         4: ["requirements"],
     }
 
@@ -45,6 +46,105 @@ class LeadFormClass(OwnerQuerysetMixin, HorillaMultiStepForm):
         if self.current_step < len(self.step_fields):
             self.fields["created_by"].required = False
             self.fields["updated_by"].required = False
+
+        self.fields["country"].widget.attrs.update(
+            {
+                "hx-get": reverse_lazy("horilla_core:get_country_subdivisions"),
+                "hx-target": "#id_state",
+                "hx-trigger": "change",
+            }
+        )
+        self.fields["state"] = forms.ChoiceField(
+            choices=[],
+            required=False,
+            widget=forms.Select(
+                attrs={"id": "id_state", "class": "js-example-basic-single headselect"}
+            ),
+        )
+
+        if "country" in self.data:
+            country_code = self.data.get("country")
+            self.fields["state"].choices = self.get_subdivision_choices(country_code)
+        elif self.instance.pk and self.instance.country:
+            self.fields["state"].choices = self.get_subdivision_choices(
+                self.instance.country.code
+            )
+
+    def get_subdivision_choices(self, country_code):
+        try:
+            subdivisions = list(
+                pycountry.subdivisions.get(country_code=country_code.upper())
+            )
+            return [(sub.code, sub.name) for sub in subdivisions]
+        except:
+            return []
+
+
+class LeadSingleForm(HorillaModelForm):
+    """
+    Custom form for Lead to add HTMX attributes
+    Inherits from HorillaModelForm to preserve all existing behavior.
+    """
+
+    class Meta:
+        """Meta class for LeadStatusForm"""
+
+        model = Lead
+        fields = [
+            "lead_owner",
+            "title",
+            "first_name",
+            "last_name",
+            "email",
+            "contact_number",
+            "lead_source",
+            "lead_status",
+            "lead_company",
+            "no_of_employees",
+            "industry",
+            "annual_revenue",
+            "country",
+            "state",
+            "city",
+            "zip_code",
+            "fax",
+            "requirements",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["country"].widget.attrs.update(
+            {
+                "hx-get": reverse_lazy("horilla_core:get_country_subdivisions"),
+                "hx-target": "#id_state",
+                "hx-trigger": "change",
+                "hx-swap": "innerHTML",
+            }
+        )
+        self.fields["state"] = forms.ChoiceField(
+            choices=[],
+            required=False,
+            widget=forms.Select(
+                attrs={"id": "id_state", "class": "js-example-basic-single headselect"}
+            ),
+        )
+
+        if "country" in self.data:
+            country_code = self.data.get("country")
+            self.fields["state"].choices = self.get_subdivision_choices(country_code)
+        elif self.instance.pk and self.instance.country:
+            self.fields["state"].choices = self.get_subdivision_choices(
+                self.instance.country.code
+            )
+
+    def get_subdivision_choices(self, country_code):
+        try:
+            subdivisions = list(
+                pycountry.subdivisions.get(country_code=country_code.upper())
+            )
+            return [(sub.code, sub.name) for sub in subdivisions]
+        except:
+            return []
 
 
 class LeadConversionForm(forms.Form):

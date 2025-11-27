@@ -17,6 +17,7 @@ from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
+from django_countries.fields import CountryField
 
 from horilla.registry.feature import feature_enabled
 from horilla_core.models import Company, HorillaCoreModel, MultipleCurrency
@@ -269,7 +270,7 @@ class Lead(HorillaCoreModel):
     )
     city = models.CharField(blank=True, max_length=100, verbose_name=_("City"))
     state = models.CharField(blank=True, max_length=100, verbose_name=_("State"))
-    country = models.CharField(blank=True, max_length=100, verbose_name=_("Country"))
+    country = CountryField(verbose_name=_("Country"))
     zip_code = models.CharField(max_length=100, blank=True, verbose_name=_("Zip"))
     requirements = models.TextField(
         blank=True, null=True, verbose_name=_("Requirements")

@@ -17,6 +17,7 @@ from auditlog.models import LogEntry
 from django import forms
 from django.apps import apps
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import redirect_to_login
 from django.contrib.contenttypes.fields import GenericRelation
@@ -4536,6 +4537,31 @@ class HorillaMultiStepFormView(FormView):
     permission_denied_template = "error/403.html"
     skip_permission_check = False
 
+    single_step_url_name = None
+
+    def get_single_step_url(self):
+        """Get the URL for single-step form"""
+        if not self.single_step_url_name:
+            return None
+
+        pk = self.kwargs.get(self.pk_url_kwarg)
+        if pk:
+            # For edit mode, use edit URL
+            if isinstance(self.single_step_url_name, dict):
+                url_name = self.single_step_url_name.get("edit")
+                return (
+                    reverse(url_name, kwargs={self.pk_url_kwarg: pk})
+                    if url_name
+                    else None
+                )
+            return reverse(self.single_step_url_name, kwargs={self.pk_url_kwarg: pk})
+        else:
+            # For create mode, use create URL
+            if isinstance(self.single_step_url_name, dict):
+                url_name = self.single_step_url_name.get("create")
+                return reverse(url_name) if url_name else None
+            return reverse(self.single_step_url_name)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.storage_key = f"{self.__class__.__name__}_form_data"
@@ -4674,7 +4700,14 @@ class HorillaMultiStepFormView(FormView):
         return super().get_form_class()
 
     def get_initial_step(self):
-        return int(self.request.POST.get("step", 1))
+        """Get the initial step, ensuring it's valid and within bounds."""
+        try:
+            step = int(self.request.POST.get("step", 1))
+            if step < 1 or step > self.total_steps:
+                return 1
+            return step
+        except (ValueError, TypeError):
+            return 1
 
     def encode_file_for_session(self, uploaded_file):
         """Encode file to store in session"""
@@ -4943,6 +4976,7 @@ class HorillaMultiStepFormView(FormView):
                 if field_name in self.fullwidth_fields:
                     field.widget.attrs["fullwidth"] = True
 
+        context["single_step_url"] = self.get_single_step_url()
         return context
 
     def form_valid(self, form):
@@ -5031,16 +5065,8 @@ class HorillaMultiStepFormView(FormView):
 
             if final_form.is_valid():
                 try:
-                    instance = final_form.save(commit=False)
-                    if not self.object:
-                        instance.created_by = self.request.user
-                        instance.updated_by = self.request.user
-                        instance.created_at = timezone.now()
-                        instance.updated_at = timezone.now()
-                    else:
-                        instance.updated_by = self.request.user
-                        instance.updated_at = timezone.now()
 
+                    instance = final_form.save(commit=False)
                     instance.company = (
                         getattr(_thread_local, "request", None).active_company
                         if hasattr(_thread_local, "request")
@@ -5198,6 +5224,27 @@ class HorillaSingleFormView(FormView):
     check_object_permission = True
     permission_denied_template = "error/403.html"
     skip_permission_check = False
+
+    multi_step_url_name = None
+
+    def get_multi_step_url(self):
+        """Get the URL for multi-step form"""
+        if not self.multi_step_url_name:
+            return None
+
+        pk = self.kwargs.get("pk")
+        if pk:
+            # For edit mode, use edit URL
+            if isinstance(self.multi_step_url_name, dict):
+                url_name = self.multi_step_url_name.get("edit")
+                return reverse(url_name, kwargs={"pk": pk}) if url_name else None
+            return reverse(self.multi_step_url_name, kwargs={"pk": pk})
+        else:
+            # For create mode, use create URL
+            if isinstance(self.multi_step_url_name, dict):
+                url_name = self.multi_step_url_name.get("create")
+                return reverse(url_name) if url_name else None
+            return reverse(self.multi_step_url_name)
 
     def dispatch(self, request, *args, **kwargs):
         # Check permissions before processing
@@ -5519,6 +5566,7 @@ class HorillaSingleFormView(FormView):
         context["header"] = self.header
         context["modal_height_class"] = self.modal_height_class
         context["hx_attrs"] = {**default_hx_attrs, **(self.hx_attrs or {})}
+        context["multi_step_url"] = self.get_multi_step_url()
         return context
 
     def get_form_url(self):

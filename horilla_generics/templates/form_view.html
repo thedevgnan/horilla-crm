@@ -9,12 +9,38 @@
         class="w-full">
         {% csrf_token %}
         <input type="hidden" name="step" value="{{ current_step }}">
-        <div class="flex justify-between items-center p-5">
+        <div class="flex justify-between items-center p-4">
             <h2 class="text-lg font-semibold">{{ form_title }}</h2>
-            <a id="modalCloseButton" onclick="closeModal()" class="text-gray-500 hover:text-red-500 text-xl">
+
+            <a id="modalCloseButton" onclick="closeModal()" class="text-gray-500 hover:text-red-500 text-xl cursor-pointer">
                 <img src="{% static 'assets/icons/close.svg' %}" alt="Close" />
             </a>
         </div>
+
+        {% if current_step == 1 and single_step_url %}
+        <div class="p-4 pt-0 mb-2">
+            <ul class="flex gap-2 text-sm font-normal text-gray-500">
+                <li>
+                    <a href="{{ form_url }}"
+                       class="inline-flex items-center px-3 py-1 rounded-sm w-full text-xs text-white bg-primary-600"
+                       hx-get="{{ form_url }}"
+                       hx-target="#modalBox"
+                       hx-swap="innerHTML">
+                       {% trans "Multi-Step Form" %}
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ single_step_url }}"
+                       class="inline-flex items-center px-3 py-1 rounded-sm w-full text-xs bg-primary-200 text-primary-600"
+                       hx-get="{{ single_step_url }}"
+                       hx-target="#modalBox"
+                       hx-swap="innerHTML">
+                       {% trans "Single-Step Form" %}
+                    </a>
+                </li>
+            </ul>
+        </div>
+        {% endif %}
 
         <div class="p-5 py-0">
             <ul class="progress overflow-hidden overflow-x-auto">

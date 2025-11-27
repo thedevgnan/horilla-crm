@@ -23,7 +23,11 @@ from horilla_core.decorators import (
 from horilla_crm.accounts.models import Account
 from horilla_crm.contacts.models import Contact, ContactAccountRelationship
 from horilla_crm.leads.filters import LeadFilter
-from horilla_crm.leads.forms import LeadConversionForm, LeadFormClass  # type: ignore
+from horilla_crm.leads.forms import (  # type: ignore
+    LeadConversionForm,
+    LeadFormClass,
+    LeadSingleForm,
+)
 from horilla_crm.leads.models import Lead, LeadStatus
 from horilla_crm.opportunities.models import (
     Opportunity,
@@ -470,6 +474,11 @@ class LeadFormView(LoginRequiredMixin, HorillaMultiStepFormView):
         },
     }
 
+    single_step_url_name = {
+        "create": "leads:leads_create_single",
+        "edit": "leads:leads_edit_single",
+    }
+
     @cached_property
     def form_url(self):
         """Form URL for lead"""
@@ -835,7 +844,7 @@ class LeadsSingleFormView(LoginRequiredMixin, HorillaSingleFormView):
     """Lead Create/Update Single Page View"""
 
     model = Lead
-    exclude = ["additional_info"]
+    form_class = LeadSingleForm
     full_width_fields = ["requirements"]
     dynamic_create_fields = ["lead_status"]
     dynamic_create_field_mapping = {
@@ -844,6 +853,8 @@ class LeadsSingleFormView(LoginRequiredMixin, HorillaSingleFormView):
             "full_width_fields": ["name"],
         },
     }
+
+    multi_step_url_name = {"create": "leads:leads_create", "edit": "leads:leads_edit"}
 
     @cached_property
     def form_url(self):

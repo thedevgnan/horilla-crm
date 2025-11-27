@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django import forms
 from django.db import models
+from django.db.models import Q
 from django.db.models.fields import Field
 from django.db.models.fields.files import ImageFieldFile
 from django.templatetags.static import static
@@ -711,6 +712,7 @@ class PasswordInputWithEye(forms.PasswordInput):
 
 
 class HorillaModelForm(forms.ModelForm):
+
     def __init__(self, *args, **kwargs):
         self.full_width_fields = kwargs.pop("full_width_fields", [])
         self.dynamic_create_fields = kwargs.pop("dynamic_create_fields", [])
@@ -1127,6 +1129,194 @@ class HorillaModelForm(forms.ModelForm):
 
             except Exception as e:
                 logger.error(f"Error adding condition field {field_name}: {str(e)}")
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        # Validate ALL ForeignKey and ManyToMany fields
+        for field_name, field in self.fields.items():
+            if field_name not in cleaned_data:
+                continue
+
+            value = cleaned_data[field_name]
+            if not value:
+                continue
+
+            # Skip condition fields (handled separately)
+            if self.condition_fields and field_name in self.condition_fields:
+                continue
+
+            try:
+                model = self._meta.model
+                try:
+                    model_field = model._meta.get_field(field_name)
+                except:
+                    continue
+
+                # Validate ModelChoiceField (ForeignKey)
+                if isinstance(field, forms.ModelChoiceField) and isinstance(
+                    model_field, models.ForeignKey
+                ):
+                    # Get FRESH filtered queryset
+                    fresh_queryset = self._get_fresh_queryset(
+                        field_name, model_field.related_model
+                    )
+                    if (
+                        fresh_queryset is not None
+                        and not fresh_queryset.filter(pk=value.pk).exists()
+                    ):
+                        self.add_error(
+                            field_name,
+                            "Invalid selection. You don't have permission to select this option.",
+                        )
+
+                # Validate ModelMultipleChoiceField (ManyToMany)
+                elif isinstance(field, forms.ModelMultipleChoiceField) and isinstance(
+                    model_field, models.ManyToManyField
+                ):
+                    # Get FRESH filtered queryset
+                    fresh_queryset = self._get_fresh_queryset(
+                        field_name, model_field.related_model
+                    )
+                    if fresh_queryset is not None:
+                        submitted_pks = set([obj.pk for obj in value])
+                        valid_pks = set(fresh_queryset.values_list("pk", flat=True))
+                        if not submitted_pks.issubset(valid_pks):
+                            self.add_error(
+                                field_name,
+                                "Invalid selection. You don't have permission to select some options.",
+                            )
+
+                # Validate ChoiceField (for fields with choices)
+                elif isinstance(field, forms.ChoiceField) and not isinstance(
+                    field, forms.ModelChoiceField
+                ):
+                    if hasattr(field, "choices") and field.choices:
+                        valid_choices = [choice[0] for choice in field.choices]
+                        if value not in valid_choices:
+                            self.add_error(
+                                field_name,
+                                "Invalid choice. Please select a valid option.",
+                            )
+
+            except Exception as e:
+                logger.error(f"Error validating field {field_name}: {str(e)}")
+
+        # Validate condition fields
+        if self.condition_fields and self.condition_model:
+            for field_name in self.condition_fields:
+                if field_name not in cleaned_data or not cleaned_data[field_name]:
+                    continue
+
+                try:
+                    value = cleaned_data[field_name]
+                    field = self.fields.get(field_name)
+                    model_field = self.condition_model._meta.get_field(field_name)
+
+                    if not field:
+                        continue
+
+                    # Validate ModelChoiceField in condition fields
+                    if isinstance(field, forms.ModelChoiceField) and isinstance(
+                        model_field, models.ForeignKey
+                    ):
+                        fresh_queryset = self._get_fresh_queryset(
+                            field_name, model_field.related_model
+                        )
+                        if fresh_queryset is not None:
+                            pk_to_check = value.pk if hasattr(value, "pk") else value
+                            if not fresh_queryset.filter(pk=pk_to_check).exists():
+                                self.add_error(
+                                    field_name,
+                                    "Select a valid choice. That choice is not one of the available choices.",
+                                )
+
+                    # Validate ChoiceField in condition fields
+                    elif isinstance(field, forms.ChoiceField) and not isinstance(
+                        field, forms.ModelChoiceField
+                    ):
+                        if hasattr(field, "choices") and field.choices:
+                            valid_choices = [choice[0] for choice in field.choices]
+                            if value not in valid_choices:
+                                self.add_error(
+                                    field_name,
+                                    "Select a valid choice. That choice is not one of the available choices.",
+                                )
+
+                except Exception as e:
+                    logger.error(
+                        f"Error validating condition field {field_name}: {str(e)}"
+                    )
+
+        return cleaned_data
+
+    def _get_fresh_queryset(self, field_name, related_model):
+        """
+        Get a FRESH filtered queryset by re-applying owner filtration logic.
+        """
+        if not self.request or not self.request.user:
+            return None
+
+        try:
+            from django.contrib.auth import get_user_model
+
+            User = get_user_model()
+            user = self.request.user
+
+            # Start with all objects
+            queryset = related_model.objects.all()
+
+            # Apply owner filtration (same as Select2 view)
+            if related_model is User:
+                allowed_user_ids = self._get_allowed_user_ids(user)
+                queryset = queryset.filter(id__in=allowed_user_ids)
+            elif hasattr(related_model, "OWNER_FIELDS") and related_model.OWNER_FIELDS:
+                allowed_user_ids = self._get_allowed_user_ids(user)
+                if allowed_user_ids:
+                    query = Q()
+                    for owner_field in related_model.OWNER_FIELDS:
+                        query |= Q(**{f"{owner_field}__id__in": allowed_user_ids})
+                    queryset = queryset.filter(query)
+                else:
+                    queryset = queryset.none()
+
+            return queryset
+
+        except Exception as e:
+            logger.error(f"Error getting fresh queryset for {field_name}: {str(e)}")
+            return related_model.objects.all()
+
+    def _get_allowed_user_ids(self, user):
+        """Get list of allowed user IDs (self + subordinates)"""
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
+        if not user or not user.is_authenticated:
+            return []
+
+        if user.is_superuser:
+            return list(User.objects.values_list("id", flat=True))
+
+        user_role = getattr(user, "role", None)
+        if not user_role:
+            return [user.id]
+
+        def get_subordinate_roles(role):
+            sub_roles = role.subroles.all()
+            all_sub_roles = []
+            for sub_role in sub_roles:
+                all_sub_roles.append(sub_role)
+                all_sub_roles.extend(get_subordinate_roles(sub_role))
+            return all_sub_roles
+
+        subordinate_roles = get_subordinate_roles(user_role)
+        subordinate_users = User.objects.filter(role__in=subordinate_roles).distinct()
+
+        allowed_user_ids = [user.id] + list(
+            subordinate_users.values_list("id", flat=True)
+        )
+        return allowed_user_ids
 
 
 class HorillaHistoryForm(forms.Form):
