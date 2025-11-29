@@ -251,7 +251,8 @@ class DeleteUserFromRole(LoginRequiredMixin, View):
 
 @method_decorator(htmx_required, name="dispatch")
 @method_decorator(
-    permission_required_or_denied("horilla_core:delete_role"), name="dispatch"
+    permission_required_or_denied("horilla_core:delete_role", modal=True),
+    name="dispatch",
 )
 class RoleDeleteView(LoginRequiredMixin, HorillaSingleDeleteView):
 
