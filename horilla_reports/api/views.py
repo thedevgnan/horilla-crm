@@ -1,5 +1,5 @@
 """
-API views for horilla_crm.reports models
+API views for horilla_reports models
 
 This module mirrors horilla_core/accounts API patterns including search, filtering,
 bulk update, bulk delete, permissions, and documentation.

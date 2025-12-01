@@ -274,6 +274,18 @@ class ReportDetailView(RecentlyViewedMixin, LoginRequiredMixin, DetailView):
     template_name = "report_detail.html"
     context_object_name = "report"
 
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+        try:
+            self.object = self.get_object()
+        except Exception as e:
+            if request.headers.get("HX-Request") == "true":
+                messages.error(self.request, e)
+                return HttpResponse(headers={"HX-Refresh": "true"})
+            raise HorillaHttp404(e)
+        return super().dispatch(request, *args, **kwargs)
+
     def col_attrs(self):
         """Define column attributes for clickable rows in the report list view."""
         query_params = {}
@@ -4195,7 +4207,8 @@ class MarkReportAsFavouriteView(LoginRequiredMixin, View):
 
 @method_decorator(htmx_required, name="dispatch")
 @method_decorator(
-    permission_required_or_denied("horilla_reports.delete_report"), name="dispatch"
+    permission_required_or_denied("horilla_reports.delete_report", modal=True),
+    name="dispatch",
 )
 class ReportDeleteView(LoginRequiredMixin, HorillaSingleDeleteView):
     model = Report
@@ -4206,7 +4219,7 @@ class ReportDeleteView(LoginRequiredMixin, HorillaSingleDeleteView):
 
 @method_decorator(htmx_required, name="dispatch")
 @method_decorator(
-    permission_required_or_denied("horilla_reports.delete_reportfolder"),
+    permission_required_or_denied("horilla_reports.delete_reportfolder", modal=True),
     name="dispatch",
 )
 class FolderDeleteView(LoginRequiredMixin, HorillaSingleDeleteView):

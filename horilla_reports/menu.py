@@ -1,6 +1,6 @@
 """
 This module registers Floating, Settings, My Settings, and Main Section menus
-for the Horilla CRM Reports app
+for the Horilla Reports app
 """
 
 from django.urls import reverse_lazy

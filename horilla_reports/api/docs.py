@@ -1,5 +1,5 @@
 """
-Documentation for horilla_crm.reports API endpoints
+Documentation for horilla_reports API endpoints
 """
 
 # Report Folder API documentation

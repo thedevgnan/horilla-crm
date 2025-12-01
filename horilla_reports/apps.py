@@ -1,5 +1,5 @@
 """
-App configuration for the Reports module in Horilla CRM.
+App configuration for the Reports module in Horilla.
 Handles app metadata and auto-registering URLs.
 """
 
@@ -10,7 +10,7 @@ from django.utils.translation import gettext_lazy as _
 
 class ReportsConfig(AppConfig):
     """
-    Configuration class for the Reports app in Horilla CRM.
+    Configuration class for the Reports app in Horilla.
     """
 
     default_auto_field = "django.db.models.BigAutoField"

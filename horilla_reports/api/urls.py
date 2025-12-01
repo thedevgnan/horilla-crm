@@ -1,5 +1,5 @@
 """
-URL patterns for horilla_crm.reports API
+URL patterns for horilla_reports API
 """
 
 from django.urls import include, path

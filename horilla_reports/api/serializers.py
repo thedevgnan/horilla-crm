@@ -1,5 +1,5 @@
 """
-Serializers for horilla_crm.reports models
+Serializers for horilla_reports models
 """
 
 from rest_framework import serializers
