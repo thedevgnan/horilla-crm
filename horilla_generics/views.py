@@ -257,7 +257,7 @@ class HorillaListView(ListView):
     default_sort_field = None
     default_sort_direction = "asc"
     sort_by_mapping = []
-    paginate_by = 5
+    paginate_by = 100
     page_kwarg = "page"
     main_url: str = ""
     search_url: str = ""
@@ -422,8 +422,20 @@ class HorillaListView(ListView):
             queryset = queryset.order_by("-created_at")
         elif view_type == "recently_modified":
             queryset = queryset.order_by("-updated_at")
+        elif self.default_sort_field:
+            # Use default_sort_field if specified in child class
+            order_prefix = "-" if self.default_sort_direction == "desc" else ""
+            queryset = queryset.order_by(f"{order_prefix}{self.default_sort_field}")
         else:
             queryset = queryset.order_by("-id")
+        # elif sort_field:
+        #     queryset = self._apply_sorting(queryset, sort_field, sort_direction)
+        # elif view_type == "recently_created":
+        #     queryset = queryset.order_by("-created_at")
+        # elif view_type == "recently_modified":
+        #     queryset = queryset.order_by("-updated_at")
+        # else:
+        #     queryset = queryset.order_by("-id")
 
         if self.store_ordered_ids:
             ordered_ids = list(queryset.values_list("pk", flat=True))
@@ -4535,12 +4547,6 @@ class HorillaNotesAttachementSectionView(DetailView):
             bool: True if user has permission, False otherwise
         """
         user = self.request.user
-
-        # Superuser always has permission
-        if user.is_superuser:
-            return True
-
-        # Check if user has change permission on HorillaAttachment
         if user.has_perm("horilla_core.change_horillaattachment"):
             return True
 
@@ -4560,9 +4566,6 @@ class HorillaNotesAttachementSectionView(DetailView):
             bool: True if user has permission, False otherwise
         """
         user = self.request.user
-
-        if user.has_perm("horilla_core.add_horillaattachment"):
-            return True
 
         related_object = self.get_object()
         related_model = related_object.__class__
@@ -4591,13 +4594,16 @@ class HorillaNotesAttachementSectionView(DetailView):
 
         if is_owner:
             change_own_perm = f"{app_label}.change_own_{model_name}"
-            if user.has_perm(change_own_perm):
+            if user.has_perm(change_own_perm) and user.has_perm(
+                "horilla_core.add_horillaattachment"
+            ):
                 return True
 
-        add_perm = f"{app_label}.add_{model_name}"
         change_perm = f"{app_label}.change_{model_name}"
 
-        if user.has_perm(add_perm) or user.has_perm(change_perm):
+        if user.has_perm(change_perm) and user.has_perm(
+            "horilla_core.add_horillaattachment"
+        ):
             return True
 
         return False
@@ -4706,8 +4712,6 @@ class HorillaNotesAttachmentCreateView(LoginRequiredMixin, FormView):
             bool: True if user has permission, False otherwise
         """
         user = self.request.user
-        if user.is_superuser:
-            return True
 
         related_model = related_object.__class__
         model_name = related_model._meta.model_name
@@ -4733,16 +4737,15 @@ class HorillaNotesAttachmentCreateView(LoginRequiredMixin, FormView):
 
         if is_owner:
             change_own_perm = f"{app_label}.change_own_{model_name}"
-            if user.has_perm(change_own_perm):
-                return True
-
-        if permission_type == "add":
-            add_perm = f"{app_label}.add_{model_name}"
-            if user.has_perm(add_perm):
+            if user.has_perm(change_own_perm) and user.has_perm(
+                "horilla_core.add_horillaattachment"
+            ):
                 return True
 
         change_perm = f"{app_label}.change_{model_name}"
-        if user.has_perm(change_perm):
+        if user.has_perm(change_perm) and user.has_perm(
+            "horilla_core.add_horillaattachment"
+        ):
             return True
 
         return False

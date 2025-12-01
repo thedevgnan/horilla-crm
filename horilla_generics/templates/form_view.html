@@ -176,22 +176,34 @@
 
                         {% else %}
                             <div class="flex justify-between items-center {% if 'select' in field.field.widget.attrs.class|lower or field.field.widget.input_type == 'select' %}mb-2{% else %}mb-1{% endif %}">
-                                <label for="{{ field.id_for_label }}" class="text-xs text-color-600">
-                                    {{ field.label }}
-                                    {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
-                                </label>
-                                    {% if field.name in dynamic_create_fields and field.name in related_models_info %}
-                                        <button type="button"
-                                            id="generic-button"
-                                            class="text-primary-600 hover:text-primary-800 text-xs font-semibold px-2 py-1 bg-primary-300 rounded border border-primary-200  transition-colors"
-                                            hx-get="{% url 'horilla_generics:dynamic_create' related_models_info|get_item_form:field.name|get_item_form:'app_label' related_models_info|get_item_form:field.name|get_item_form:'model_name' %}?target_field={{ field.name }}&fields={{ dynamic_create_field_mapping|get_item_form:field.name|get_item_form:'fields'|join:',' }}&full_width_fields={{ dynamic_create_field_mapping|get_item_form:field.name|get_item_form:'full_width_fields'|join:',' }}"
-                                            hx-target="#dynamicCreateModalBox"
-                                            hx-on:click="openDynamicModal();"
-                                            hx-swap="innerHTML"
-                                            >
-                                            + Add
-                                        </button>
+                                <div class="flex justify-between mb-1 w-full">
+                                    <label for="{{ field.id_for_label }}" class="text-xs text-color-600">
+                                        {{ field.label }}
+                                        {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+                                    </label>
+                                    {% if field.help_text %}
+                                        <span class="group relative ml-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="cursor-pointer text-[#a19e9e]" width="15" height="15" viewBox="0 0 20 20">
+                                                <path fill="currentColor" d="M2.93 17.07A10 10 0 1 1 17.07 2.93A10 10 0 0 1 2.93 17.07m12.73-1.41A8 8 0 1 0 4.34 4.34a8 8 0 0 0 11.32 11.32M9 11V9h2v6H9zm0-6h2v2H9z"/>
+                                            </svg>
+                                            <div class="min-w-[200px] z-40 absolute h-max p-[10px] left-auto right-[1.5rem] top-0 bg-[#000000] text-[.7rem] rounded-[5px] text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                                                <p>{{ field.help_text }}</p>
+                                            </div>
+                                        </span>
                                     {% endif %}
+                                </div>
+                                {% if field.name in dynamic_create_fields and field.name in related_models_info %}
+                                    <button type="button"
+                                        id="generic-button"
+                                        class="whitespace-nowrap text-primary-600 hover:text-primary-800 text-xs font-semibold px-2 py-1 bg-primary-300 rounded border border-primary-200  transition-colors"
+                                        hx-get="{% url 'horilla_generics:dynamic_create' related_models_info|get_item_form:field.name|get_item_form:'app_label' related_models_info|get_item_form:field.name|get_item_form:'model_name' %}?target_field={{ field.name }}&fields={{ dynamic_create_field_mapping|get_item_form:field.name|get_item_form:'fields'|join:',' }}&full_width_fields={{ dynamic_create_field_mapping|get_item_form:field.name|get_item_form:'full_width_fields'|join:',' }}"
+                                        hx-target="#dynamicCreateModalBox"
+                                        hx-on:click="openDynamicModal();"
+                                        hx-swap="innerHTML"
+                                        >
+                                        + Add
+                                    </button>
+                                {% endif %}
                             </div>
                             {{ field }}
                         {% endif %}
