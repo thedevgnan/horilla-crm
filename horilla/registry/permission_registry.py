@@ -12,6 +12,7 @@ PERMISSION_EXEMPT_MODELS = {
     "Group",
     "Permission",
     "ContentType",
+    "Attachment",
 }
 
 
