@@ -262,7 +262,8 @@ class HorillaListView(ListView):
     main_url: str = ""
     search_url: str = ""
     filterset_class = None
-    max_visible_actions = 3
+    filter_url_push = True
+    max_visible_actions = 4
     bulk_update_fields = []
     bulk_update_two_column = False
     raw_attrs: list = []
@@ -2189,6 +2190,7 @@ class HorillaListView(ListView):
                 pass
         context["view_type"] = view_type
         context["filter_fields"] = filter_fields
+        context["filter_push_url"] = self.filter_url_push
         context["model_verbose_name"] = self.model._meta.verbose_name_plural
         context["model_name"] = self.model.__name__
         context["no_record_add_button"] = self.no_record_add_button or {}
@@ -5621,6 +5623,7 @@ class HorillaSingleFormView(FormView):
     skip_permission_check = False
 
     multi_step_url_name = None
+    duplicate_mode = False
 
     def get_multi_step_url(self):
         """Get the URL for multi-step form"""
@@ -5642,7 +5645,11 @@ class HorillaSingleFormView(FormView):
             return reverse(self.multi_step_url_name)
 
     def dispatch(self, request, *args, **kwargs):
-        # Check permissions before processing
+        if "pk" in self.kwargs:
+            self.duplicate_mode = (
+                request.GET.get("duplicate", "false").lower() == "true"
+            )
+
         if not self.skip_permission_check and not self.has_permission():
             return render(request, self.permission_denied_template, {"modal": True})
 
@@ -5668,6 +5675,9 @@ class HorillaSingleFormView(FormView):
 
         app_label = self.model._meta.app_label
         model_name = self.model._meta.model_name
+
+        if self.duplicate_mode:
+            return [f"{app_label}.add_{model_name}"]
 
         # Check if this is edit mode or create mode
         is_edit_mode = bool(self.kwargs.get("pk"))
@@ -5702,7 +5712,6 @@ class HorillaSingleFormView(FormView):
 
             if user.has_perm(change_own_perm):
                 return self.has_object_permission()
-
         return False
 
     def has_object_permission(self):
@@ -5885,8 +5894,34 @@ class HorillaSingleFormView(FormView):
         kwargs["condition_model"] = self.condition_model
         kwargs["condition_field_choices"] = self.condition_field_choices or {}
         kwargs["hidden_fields"] = getattr(self, "hidden_fields", [])
-        if self.object:
+        if self.object and not self.duplicate_mode:
             kwargs["instance"] = self.object
+        elif self.object and self.duplicate_mode:
+            # In duplicate mode, populate initial data from the object
+            initial = kwargs.get("initial", {})
+            for field in self.object._meta.fields:
+                if field.name not in [
+                    "id",
+                    "pk",
+                    "created_at",
+                    "updated_at",
+                    "created_by",
+                    "updated_by",
+                ]:
+                    field_value = getattr(self.object, field.name)
+                    if field_value is not None:
+                        if field.get_internal_type() in ["CharField", "TextField"]:
+                            initial[field.name] = f"{field_value} (Copy)"
+                        else:
+                            initial[field.name] = field_value
+
+            # Handle ManyToMany fields
+            for field in self.object._meta.many_to_many:
+                m2m_value = getattr(self.object, field.name).all()
+                if m2m_value.exists():
+                    initial[field.name] = list(m2m_value)
+
+            kwargs["initial"] = initial
         kwargs["request"] = self.request
         return kwargs
 
@@ -5894,8 +5929,9 @@ class HorillaSingleFormView(FormView):
         context = super().get_context_data(**kwargs)
         context["form_title"] = (
             self.form_title
-            or f"{'Update' if self.kwargs.get('pk') else 'Create'} {self.model._meta.verbose_name}"
+            or f"{'Duplicate' if self.duplicate_mode else 'Update' if self.kwargs.get('pk') and not self.duplicate_mode else 'Create'} {self.model._meta.verbose_name}"
         )
+        context["duplicate_mode"] = self.duplicate_mode
         context["full_width_fields"] = self.full_width_fields or []
         context["condition_fields"] = self.condition_fields or []
         context["condition_fields_tiltle"] = self.condition_field_title
@@ -5992,7 +6028,7 @@ class HorillaSingleFormView(FormView):
                 if clear_flag == "true":
                     setattr(self.object, field_name, None)
 
-        if self.kwargs.get("pk"):
+        if self.kwargs.get("pk") and not self.duplicate_mode:
             self.object.updated_at = timezone.now()
             self.object.updated_by = self.request.user
         else:
@@ -6011,7 +6047,7 @@ class HorillaSingleFormView(FormView):
         self.request.session.modified = True
         messages.success(
             self.request,
-            f"{self.model._meta.verbose_name.title()} {'updated' if self.kwargs.get('pk') else 'created'} successfully!",
+            f"{self.model._meta.verbose_name.title()} {'duplicated' if self.duplicate_mode else 'updated' if self.kwargs.get('pk') and not self.duplicate_mode else 'created'} successfully!",
         )
         return HttpResponse("<script>$('#reloadButton').click();closeModal();</script>")
 
@@ -6199,7 +6235,7 @@ class HorillaSingleDeleteView(DeleteView):
                 else self.model.objects.all()
             )
         except LookupError:
-            return render(self.request, "error/403.html")
+            return render(self.request, "error/403.html", {"modal": True})
 
     def _get_excluded_models(self):
         """
@@ -7276,7 +7312,7 @@ class HorillaSingleDeleteView(DeleteView):
 
 @method_decorator(htmx_required, name="dispatch")
 @method_decorator(
-    permission_required_or_denied("horilla_core.delete_horillaattachment"),
+    permission_required_or_denied("horilla_core.delete_horillaattachment", modal=True),
     name="dispatch",
 )
 class HorillaNotesAttachmentDeleteView(LoginRequiredMixin, HorillaSingleDeleteView):
