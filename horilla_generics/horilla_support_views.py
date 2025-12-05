@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode, urlparse
 
+import pytz
 from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -23,7 +24,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
 from django.views import View
@@ -728,7 +729,7 @@ class EditFieldView(LoginRequiredMixin, View):
     template_name = "partials/edit_field.html"
     model = None
 
-    def get_field_info(self, field, obj):
+    def get_field_info(self, field, obj, user=None):
         """Get field information including type, choices, and current value"""
         field_info = {
             "name": field.name,
@@ -830,12 +831,54 @@ class EditFieldView(LoginRequiredMixin, View):
         elif isinstance(field, models.DateTimeField):
             field_info["field_type"] = "datetime-local"
             if field_info["value"]:
-                field_info["value"] = field_info["value"].strftime("%Y-%m-%dT%H:%M")
+                dt_value = field_info["value"]
+
+                # Convert to user's timezone if available
+                if user and hasattr(user, "time_zone") and user.time_zone:
+                    try:
+                        user_tz = pytz.timezone(user.time_zone)
+                        # Make aware if naive
+                        if timezone.is_naive(dt_value):
+                            dt_value = timezone.make_aware(
+                                dt_value, timezone.get_default_timezone()
+                            )
+                        # Convert to user timezone
+                        dt_value = dt_value.astimezone(user_tz)
+                    except Exception:
+                        pass
+
+                # Format for datetime-local input (without timezone info)
+                field_info["value"] = dt_value.strftime("%Y-%m-%dT%H:%M")
+
+                # Display value with user's format
+                if user and hasattr(user, "date_time_format") and user.date_time_format:
+                    try:
+                        field_info["display_value"] = dt_value.strftime(
+                            user.date_time_format
+                        )
+                    except Exception:
+                        field_info["display_value"] = dt_value.strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
+                else:
+                    field_info["display_value"] = dt_value.strftime("%Y-%m-%d %H:%M:%S")
 
         elif isinstance(field, models.DateField):
             field_info["field_type"] = "date"
             if field_info["value"]:
-                field_info["value"] = field_info["value"].strftime("%Y-%m-%d")
+                date_value = field_info["value"]
+                field_info["value"] = date_value.strftime("%Y-%m-%d")
+
+                # Display value with user's format
+                if user and hasattr(user, "date_format") and user.date_format:
+                    try:
+                        field_info["display_value"] = date_value.strftime(
+                            user.date_format
+                        )
+                    except Exception:
+                        field_info["display_value"] = date_value.strftime("%Y-%m-%d")
+                else:
+                    field_info["display_value"] = date_value.strftime("%Y-%m-%d")
 
         elif isinstance(field, models.TextField):
             field_info["field_type"] = "textarea"
@@ -855,7 +898,7 @@ class EditFieldView(LoginRequiredMixin, View):
             messages.error(self.request, e)
             return HttpResponse("<script>$('#reloadButton').click();</script>")
 
-        field_info = self.get_field_info(field, obj)
+        field_info = self.get_field_info(field, obj, request.user)
 
         context = {
             "object_id": pk,
@@ -945,13 +988,47 @@ class UpdateFieldView(LoginRequiredMixin, View):
                     elif isinstance(field, models.FloatField):
                         setattr(obj, field_name, float(value) if value else None)
 
-                    elif isinstance(field, (models.DateField, models.DateTimeField)):
+                    elif isinstance(field, models.DateTimeField):
                         if value:
                             try:
-                                if isinstance(field, models.DateTimeField):
-                                    parsed_value = datetime.fromisoformat(value)
-                                else:  # DateField
-                                    parsed_value = datetime.fromisoformat(value).date()
+                                # Parse the datetime from the input (in user's timezone)
+                                parsed_value = datetime.fromisoformat(value)
+
+                                # Get user's timezone
+                                user = request.user
+                                if hasattr(user, "time_zone") and user.time_zone:
+                                    try:
+                                        user_tz = pytz.timezone(user.time_zone)
+                                        # Make the parsed datetime aware in user's timezone
+                                        parsed_value = user_tz.localize(parsed_value)
+                                        # Convert to UTC or default timezone for storage
+                                        parsed_value = parsed_value.astimezone(
+                                            timezone.get_default_timezone()
+                                        )
+                                    except Exception:
+                                        # Fallback: make aware with default timezone
+                                        parsed_value = timezone.make_aware(
+                                            parsed_value,
+                                            timezone.get_default_timezone(),
+                                        )
+                                else:
+                                    # No user timezone, use default
+                                    parsed_value = timezone.make_aware(
+                                        parsed_value, timezone.get_default_timezone()
+                                    )
+
+                                setattr(obj, field_name, parsed_value)
+                            except ValueError as e:
+                                return HttpResponse(
+                                    f"Invalid datetime format: {value}", status=400
+                                )
+                        else:
+                            setattr(obj, field_name, None)
+
+                    elif isinstance(field, models.DateField):
+                        if value:
+                            try:
+                                parsed_value = datetime.fromisoformat(value).date()
                                 setattr(obj, field_name, parsed_value)
                             except ValueError:
                                 return HttpResponse(
@@ -970,7 +1047,7 @@ class UpdateFieldView(LoginRequiredMixin, View):
 
         # Get updated field info for display
         edit_view = EditFieldView()
-        field_info = edit_view.get_field_info(field, obj)
+        field_info = edit_view.get_field_info(field, obj, request.user)
 
         context = {
             "field_info": field_info,

@@ -3,6 +3,7 @@ import re
 from datetime import date, datetime, time
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
+import pytz
 from django import template
 from django.apps import apps
 from django.db import models
@@ -832,12 +833,14 @@ def load_registered_js():
 @register.simple_tag
 def display_field_value(obj, field_name, user):
     """
-    Template tag to display field value with automatic currency formatting
+    Template tag to display field value with automatic currency formatting,
+    datetime timezone conversion, and custom formatting
 
     Usage in template:
     {% display_field_value obj field_name request.user %}
 
     Works automatically if model has CURRENCY_FIELDS attribute
+    Handles datetime fields with user's timezone and format preferences
     """
     # Check if it's a currency field - AUTOMATICALLY DETECTS!
     if (
@@ -856,6 +859,39 @@ def display_field_value(obj, field_name, user):
     if value is None:
         return ""
 
+    # Handle DateTime fields with timezone conversion and formatting
+    if isinstance(value, datetime):
+        # Convert to user's timezone if user has timezone preference
+        if hasattr(user, "time_zone") and user.time_zone:
+            try:
+                user_tz = pytz.timezone(user.time_zone)
+                # Make aware if naive
+                if timezone.is_naive(value):
+                    value = timezone.make_aware(value, timezone.get_default_timezone())
+                # Convert to user timezone
+                value = value.astimezone(user_tz)
+            except Exception:
+                pass  # Fall back to default timezone
+
+        # Format according to user's datetime format preference
+        if hasattr(user, "date_time_format") and user.date_time_format:
+            try:
+                return value.strftime(user.date_time_format)
+            except Exception:
+                pass
+
+        # Default datetime format
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+
+    # Handle Date fields
+    if isinstance(value, date):
+        if hasattr(user, "date_format") and user.date_format:
+            try:
+                return value.strftime(user.date_format)
+            except Exception:
+                pass
+        return value.strftime("%Y-%m-%d")
+
     # Handle ManyToMany fields
     if hasattr(value, "all"):
         related_objects = value.all()
@@ -868,7 +904,7 @@ def display_field_value(obj, field_name, user):
         field = obj._meta.get_field(field_name)
         if hasattr(field, "choices") and field.choices:
             return dict(field.choices).get(value, value)
-    except:
+    except Exception:
         pass
 
     # Handle foreign keys and relations
