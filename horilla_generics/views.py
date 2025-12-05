@@ -5092,7 +5092,7 @@ class HorillaMultiStepFormView(FormView):
                             return True
 
             fallback_owner_fields = [
-                f"{self.model._meta.model_name}_owner",  # e.g., campaign_owner
+                f"{self.model._meta.model_name}_owner",
                 "owner",
                 "created_by",
                 "user",
@@ -5837,7 +5837,7 @@ class HorillaSingleFormView(FormView):
                             return True
 
             fallback_owner_fields = [
-                f"{self.model._meta.model_name}_owner",  # e.g., campaign_owner
+                f"{self.model._meta.model_name}_owner",
                 "owner",
                 "created_by",
                 "user",
