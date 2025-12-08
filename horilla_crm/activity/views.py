@@ -121,15 +121,15 @@ class AllActivityListView(LoginRequiredMixin, HorillaListView):
         if "section" in self.request.GET:
             query_params["section"] = self.request.GET.get("section")
         query_string = urlencode(query_params)
-        attrs = {}
         attrs = {
             "hx-get": f"{{get_detail_url}}?{query_string}",
             "hx-target": "#mainContent",
             "hx-swap": "outerHTML",
             "hx-push-url": "true",
             "hx-select": "#mainContent",
-            "style": "cursor:pointer",
-            "class": "hover:text-primary-600",
+            "permission": "activity.change_activity",
+            "own_permission": "activity.change_own_activity",
+            "owner_field": "owner",
         }
         return [
             {
@@ -154,42 +154,27 @@ class AllActivityListView(LoginRequiredMixin, HorillaListView):
         Return actions if user is superuser, has global perms, or owns any lead in the queryset.
         Actions are shown globally (for all rows) but backend views enforce ownership/perms.
         """
-        actions = []
-
-        show_actions = (
-            self.request.user.is_superuser
-            or self.request.user.has_perm("activity.change_activity")
-            or self.get_queryset().filter(assigned_to=self.request.user).exists()
-            or (
-                self.get_queryset().filter(owner=self.request.user).exists()
-                and self.request.user.has_perm("activity.change_own_activity")
-            )
-        )
-
-        if show_actions:
-            actions.extend(
-                [
-                    {
-                        "action": "Edit",
-                        "src": "assets/icons/edit.svg",
-                        "img_class": "w-4 h-4",
-                        "attrs": """
+        actions = [
+            {
+                "action": "Edit",
+                "src": "assets/icons/edit.svg",
+                "img_class": "w-4 h-4",
+                "permission": "activity.change_activity",
+                "own_permission": "activity.change_own_activity",
+                "owner_field": ["owner", "assigned_to"],
+                "attrs": """
                             hx-get="{get_activity_edit_url}?new=true"
                             hx-target="#modalBox"
                             hx-swap="innerHTML"
                             onclick="openModal()"
                             """,
-                    },
-                ]
-            )
-
-            if self.request.user.has_perm("activity.delete_activity"):
-                actions.append(
-                    {
-                        "action": "Delete",
-                        "src": "assets/icons/a4.svg",
-                        "img_class": "w-4 h-4",
-                        "attrs": """
+            },
+            {
+                "action": "Delete",
+                "src": "assets/icons/a4.svg",
+                "img_class": "w-4 h-4",
+                "permission": "activity.delete_activity",
+                "attrs": """
                             hx-post="{get_delete_url}"
                             hx-target="#deleteModeBox"
                             hx-swap="innerHTML"
@@ -197,8 +182,8 @@ class AllActivityListView(LoginRequiredMixin, HorillaListView):
                             hx-vals='{{"check_dependencies": "true"}}'
                             onclick="openDeleteModeModal()"
                         """,
-                    }
-                )
+            },
+        ]
 
         return actions
 
@@ -221,56 +206,7 @@ class AcivityKanbanView(LoginRequiredMixin, HorillaKanbanView):
     main_url = reverse_lazy("activity:activity_view")
     group_by_field = "status"
 
-    @cached_property
-    def actions(self):
-        """
-        Return actions if user is superuser, has global perms, or owns any lead in the queryset.
-        Actions are shown globally (for all rows) but backend views enforce ownership/perms.
-        """
-        actions = []
-
-        show_actions = (
-            self.request.user.is_superuser
-            or self.request.user.has_perm("activity.change_activity")
-            or self.get_queryset().filter(owner=self.request.user).exists()
-            or self.get_queryset().filter(assigned_to=self.request.user).exists()
-        )
-
-        if show_actions:
-            actions.extend(
-                [
-                    {
-                        "action": "Edit",
-                        "src": "assets/icons/edit.svg",
-                        "img_class": "w-4 h-4",
-                        "attrs": """
-                            hx-get="{get_activity_edit_url}?new=true"
-                            hx-target="#modalBox"
-                            hx-swap="innerHTML"
-                            onclick="openModal()"
-                            """,
-                    },
-                ]
-            )
-
-            if self.request.user.has_perm("activity.delete_activity"):
-                actions.append(
-                    {
-                        "action": "Delete",
-                        "src": "assets/icons/a4.svg",
-                        "img_class": "w-4 h-4",
-                        "attrs": """
-                            hx-post="{get_delete_url}"
-                            hx-target="#deleteModeBox"
-                            hx-swap="innerHTML"
-                            hx-trigger="click"
-                            hx-vals='{{"check_dependencies": "true"}}'
-                            onclick="openDeleteModeModal()"
-                        """,
-                    }
-                )
-
-        return actions
+    actions = AllActivityListView.actions
 
     columns = [
         "subject",
@@ -278,6 +214,28 @@ class AcivityKanbanView(LoginRequiredMixin, HorillaKanbanView):
         "source",
         (_("Related To"), "related_object"),
     ]
+
+    @cached_property
+    def kanban_attrs(self):
+        """
+        Defines column attributes for rendering clickable Activity entries that load detailed views dynamically using HTMX.
+        """
+
+        query_params = {}
+        if "section" in self.request.GET:
+            query_params["section"] = self.request.GET.get("section")
+        query_string = urlencode(query_params)
+        attrs = {
+            "hx-get": f"{{get_detail_url}}?{query_string}",
+            "hx-target": "#mainContent",
+            "hx-swap": "outerHTML",
+            "hx-push-url": "true",
+            "hx-select": "#mainContent",
+            "permission": "activity.change_activity",
+            "own_permission": "activity.change_own_activity",
+            "owner_field": ["owner"],
+        }
+        return attrs
 
 
 @method_decorator(
@@ -318,63 +276,7 @@ class ActivityDetailView(RecentlyViewedMixin, LoginRequiredMixin, HorillaDetailV
         "is_active",
     ]
 
-    @cached_property
-    def actions(self):
-        """
-        Return actions if user is superuser, has global perms, or owns any lead in the queryset.
-        Actions are shown globally (for all rows) but backend views enforce ownership/perms.
-        """
-        actions = []
-
-        show_actions = (
-            self.request.user.is_superuser
-            or self.request.user.has_perm("activity.change_activity")
-            or (
-                (
-                    self.get_queryset().filter(owner=self.request.user).exists()
-                    or self.get_queryset()
-                    .filter(assigned_to=self.request.user)
-                    .exists()
-                )
-                and self.request.user.has_perm("activity.change_own_activity")
-            )
-        )
-
-        if show_actions:
-            actions.extend(
-                [
-                    {
-                        "action": "Edit",
-                        "src": "assets/icons/edit.svg",
-                        "img_class": "w-4 h-4",
-                        "attrs": """
-                            hx-get="{get_activity_edit_url}?new=true"
-                            hx-target="#modalBox"
-                            hx-swap="innerHTML"
-                            onclick="openModal()"
-                            """,
-                    },
-                ]
-            )
-
-            if self.request.user.has_perm("activity.delete_activity"):
-                actions.append(
-                    {
-                        "action": "Delete",
-                        "src": "assets/icons/a4.svg",
-                        "img_class": "w-4 h-4",
-                        "attrs": """
-                            hx-post="{get_delete_url}"
-                            hx-target="#deleteModeBox"
-                            hx-swap="innerHTML"
-                            hx-trigger="click"
-                            hx-vals='{{"check_dependencies": "true"}}'
-                            onclick="openDeleteModeModal()"
-                        """,
-                    }
-                )
-
-        return actions
+    actions = AllActivityListView.actions
 
 
 @method_decorator(
@@ -390,7 +292,6 @@ class ActivityDetailTab(LoginRequiredMixin, HorillaDetailSectionView):
     """
 
     model = Activity
-    # edit_field = False
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
